@@ -6,10 +6,22 @@ const productSchema = new mongoose.Schema({
     brand: String,
     imageUrl: String,
     defaultQuantity: { type: Number, default: 1 },
-    unit: { type: String, default: 'unit' }, // e.g., kg, liters, pack
+    alias: String, // Local name or nickname
+    notes: String,
+    consumptionDuration: { type: Number, default: 7 }, // Days a unit lasts
+    category: {
+        type: String,
+        default: 'Other',
+        enum: ['Fruits & Veggies', 'Dairy & Eggs', 'Bakery', 'Meat & Seafood', 'Pantry', 'Snacks', 'Beverages', 'Household', 'Personal Care', 'Other']
+    },
+    unit: {
+        type: String,
+        default: 'unit',
+        enum: ['unit', 'kg', 'g', 'l', 'ml', 'pack', 'dozen', 'bunch']
+    },
     averageMonthlyConsumption: { type: Number, default: 1 },
-    category: String,
     createdAt: { type: Date, default: Date.now },
 });
 
 module.exports = mongoose.model('Product', productSchema);
+

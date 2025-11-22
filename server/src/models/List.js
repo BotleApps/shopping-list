@@ -9,6 +9,7 @@ const listItemSchema = new mongoose.Schema({
 
 const listSchema = new mongoose.Schema({
     name: { type: String, required: true, default: 'My Shopping List' },
+    type: { type: String, default: 'Regular' }, // e.g., Weekly, Monthly, Party
     items: [listItemSchema],
     status: { type: String, enum: ['active', 'completed', 'archived'], default: 'active' },
     createdAt: { type: Date, default: Date.now },

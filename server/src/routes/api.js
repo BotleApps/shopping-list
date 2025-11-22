@@ -48,14 +48,79 @@ router.delete('/products/:id', async (req, res) => {
 
 // --- List Routes ---
 
-// Get active shopping list (or create one if none exists)
-router.get('/lists/active', async (req, res) => {
+// Get all active lists
+router.get('/lists', async (req, res) => {
     try {
-        let list = await List.findOne({ status: 'active' }).populate('items.product');
+        const lists = await List.find({ status: { $ne: 'archived' } }).sort({ createdAt: -1 });
+        res.json(lists);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Create a new list
+router.post('/lists', async (req, res) => {
+    const list = new List({
+        name: req.body.name || 'New Shopping List',
+        type: req.body.type || 'Regular'
+    });
+    try {
+        const newList = await list.save();
+        res.status(201).json(newList);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// Get active shopping list (Legacy support / Default)
+router.get('/lists/active', async (req, res) => {
+    console.log("Hit /lists/active");
+    try {
+        // Find the most recent active list
+        let list = await List.findOne({ status: 'active' }).sort({ createdAt: -1 }).populate('items.product');
         if (!list) {
             list = new List({ name: 'My Shopping List' });
             await list.save();
         }
+        res.json(list);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Get specific list
+router.get('/lists/:id', async (req, res) => {
+    try {
+        const list = await List.findById(req.params.id).populate('items.product');
+        if (!list) return res.status(404).json({ message: 'List not found' });
+        res.json(list);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Archive a list
+router.post('/lists/:id/archive', async (req, res) => {
+    try {
+        const list = await List.findById(req.params.id);
+        if (!list) return res.status(404).json({ message: 'List not found' });
+
+        list.status = 'archived';
+        await list.save();
+        res.json(list);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Unarchive a list
+router.post('/lists/:id/unarchive', async (req, res) => {
+    try {
+        const list = await List.findById(req.params.id);
+        if (!list) return res.status(404).json({ message: 'List not found' });
+
+        list.status = 'active';
+        await list.save();
         res.json(list);
     } catch (err) {
         res.status(500).json({ message: err.message });
