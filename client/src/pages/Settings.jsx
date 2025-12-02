@@ -1,8 +1,10 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, Moon, Globe, ChevronRight, LogOut, Bell, Shield } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
 const Settings = () => {
+    const navigate = useNavigate();
     const { theme, toggleTheme } = useTheme();
 
     return (
@@ -33,8 +35,16 @@ const Settings = () => {
                 </Section>
 
                 <Section title="Account">
-                    <SettingItem icon={<User size={20} />} title="Edit Profile" />
-                    <SettingItem icon={<Shield size={20} />} title="Privacy & Security" />
+                    <SettingItem
+                        icon={<User size={20} />}
+                        title="Edit Profile"
+                        onClick={() => navigate('/settings/profile')}
+                    />
+                    <SettingItem
+                        icon={<Shield size={20} />}
+                        title="Privacy & Security"
+                        onClick={() => navigate('/settings/security')}
+                    />
                 </Section>
 
                 <button className="w-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl flex items-center justify-center gap-2 font-semibold mt-8">
@@ -55,10 +65,10 @@ const Section = ({ title, children }) => (
     </div>
 );
 
-const SettingItem = ({ icon, title, value, type, isActive, onToggle }) => (
+const SettingItem = ({ icon, title, value, type, isActive, onToggle, onClick }) => (
     <div
         className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
-        onClick={type === 'toggle' && onToggle ? onToggle : undefined}
+        onClick={type === 'toggle' && onToggle ? onToggle : onClick}
     >
         <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200">
             {icon}

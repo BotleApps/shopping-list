@@ -13,12 +13,12 @@ const Layout = ({ children }) => {
                 {children}
             </main>
 
-            <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex justify-around p-4 z-50">
+            <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex justify-around p-4 z-50 pb-[calc(1rem+env(safe-area-inset-bottom))]">
                 <Link to="/" className={`flex flex-col items-center ${isActive('/') ? 'text-primary' : 'text-gray-400'}`}>
                     <Home size={24} />
                     <span className="text-xs mt-1 font-medium">Home</span>
                 </Link>
-                <Link to="/master" className={`flex flex-col items-center ${isActive('/master') ? 'text-primary' : 'text-gray-400'}`}>
+                <Link to="/master-list" className={`flex flex-col items-center ${isActive('/master-list') ? 'text-primary' : 'text-gray-400'}`}>
                     <List size={24} />
                     <span className="text-xs mt-1 font-medium">Master List</span>
                 </Link>

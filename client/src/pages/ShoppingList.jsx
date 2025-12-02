@@ -3,10 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { Plus, Check, Trash2, ShoppingCart, ExternalLink, Sparkles, X, ArrowLeft, ArrowUpDown } from 'lucide-react';
 import { getCategoryIcon, getCategoryColor } from '../utils/categoryIcons';
+import LoadingIndicator from '../components/LoadingIndicator';
+import { useToast } from '../context/ToastContext';
 
 const ShoppingList = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { showSuccess, showError, showInfo } = useToast();
     const [list, setList] = useState(null);
     const [products, setProducts] = useState([]);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -29,6 +32,7 @@ const ShoppingList = () => {
             setList(response.data);
         } catch (error) {
             console.error('Error fetching list:', error);
+            showError('Failed to load shopping list');
         }
     };
 
@@ -38,6 +42,7 @@ const ShoppingList = () => {
             setProducts(response.data);
         } catch (error) {
             console.error('Error fetching products:', error);
+            showError('Failed to load products');
         }
     };
 
@@ -48,8 +53,10 @@ const ShoppingList = () => {
             const response = await api.get(`/lists/${list._id}`);
             setList(response.data);
             setIsAddModalOpen(false);
+            showSuccess('Item added to list');
         } catch (error) {
             console.error('Error adding item:', error);
+            showError('Failed to add item');
         }
     };
 
@@ -61,6 +68,7 @@ const ShoppingList = () => {
             setList(response.data);
         } catch (error) {
             console.error('Error updating quantity:', error);
+            showError('Failed to update quantity');
         }
     };
 
@@ -71,6 +79,7 @@ const ShoppingList = () => {
             setList(response.data);
         } catch (error) {
             console.error('Error updating item:', error);
+            showError('Failed to update item status');
         }
     };
 
@@ -82,8 +91,10 @@ const ShoppingList = () => {
             await api.delete(`/lists/${list._id}/items/${itemId}`);
             const response = await api.get(`/lists/${list._id}`);
             setList(response.data);
+            showSuccess('Item removed');
         } catch (error) {
             console.error('Error removing item:', error);
+            showError('Failed to remove item');
         }
     };
 
@@ -95,8 +106,10 @@ const ShoppingList = () => {
             await api.post(`/lists/${list._id}/clear-completed`);
             const response = await api.get(`/lists/${list._id}`);
             setList(response.data);
+            showSuccess('Completed items cleared');
         } catch (error) {
             console.error('Error clearing completed:', error);
+            showError('Failed to clear completed items');
         }
     };
 
@@ -116,9 +129,10 @@ const ShoppingList = () => {
                 return { ...s, productDetails: product };
             }).filter(s => s.productDetails); // Filter out any missing products
             setAiSuggestions(enrichedSuggestions);
+            showInfo('AI suggestions generated!');
         } catch (error) {
             console.error('Error getting AI suggestions:', error);
-            alert('Failed to get suggestions');
+            showError('Failed to get AI suggestions');
             setIsAiModalOpen(false);
         } finally {
             setIsLoadingAi(false);
@@ -133,7 +147,7 @@ const ShoppingList = () => {
         }
     };
 
-    if (!list) return <div className="p-4 text-center">Loading...</div>;
+    if (!list) return <LoadingIndicator fullScreen message="Loading list..." />;
 
     const filteredProducts = products.filter(p =>
         (p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

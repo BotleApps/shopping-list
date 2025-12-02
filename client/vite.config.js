@@ -12,8 +12,14 @@ export default defineConfig({
         name: 'Shopping List AI',
         short_name: 'ShopList',
         description: 'Smart Shopping List with AI and Amazon Integration',
-        theme_color: '#ffffff',
+        theme_color: '#111827',
         icons: [
+          {
+            src: 'shopping-list.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any maskable'
+          },
           {
             src: 'pwa-192x192.png',
             sizes: '192x192',

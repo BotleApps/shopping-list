@@ -20,6 +20,13 @@ const productSchema = new mongoose.Schema({
         enum: ['unit', 'kg', 'g', 'l', 'ml', 'pack', 'dozen', 'bunch']
     },
     averageMonthlyConsumption: { type: Number, default: 1 },
+    preferredStore: String,
+    productLink: String,
+    lastKnownPrice: Number,
+    bestPrice: Number,
+    bestPriceStore: String,
+    bestPriceLink: String,
+    consumersCount: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now },
 });
 

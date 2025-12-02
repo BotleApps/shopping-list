@@ -2,13 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { Plus, ShoppingBag, Calendar, MoreVertical, CheckCircle, Archive, ArchiveRestore } from 'lucide-react';
+import LoadingIndicator from '../components/LoadingIndicator';
+import { useToast } from '../context/ToastContext';
 
 const Home = () => {
+    const { showSuccess, showError } = useToast();
     const [lists, setLists] = useState([]);
     const [archivedLists, setArchivedLists] = useState([]);
     const [showArchived, setShowArchived] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [newListName, setNewListName] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -16,6 +20,7 @@ const Home = () => {
     }, []);
 
     const fetchLists = async () => {
+        setIsLoading(true);
         try {
             const response = await api.get('/lists');
             const activeLists = response.data.filter(l => l.status !== 'archived');
@@ -24,6 +29,9 @@ const Home = () => {
             setArchivedLists(archived);
         } catch (error) {
             console.error('Error fetching lists:', error);
+            showError('Failed to load lists');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -35,9 +43,11 @@ const Home = () => {
                 setLists([response.data, ...lists]);
                 setIsModalOpen(false);
                 setNewListName('');
+                showSuccess('List created successfully');
                 navigate(`/list/${response.data._id}`);
             } catch (error) {
                 console.error('Error creating list:', error);
+                showError('Failed to create list');
             }
         }
     };
@@ -50,8 +60,10 @@ const Home = () => {
         try {
             await api.post(`/lists/${listId}/archive`);
             fetchLists();
+            showSuccess('List archived');
         } catch (error) {
             console.error('Error archiving list:', error);
+            showError('Failed to archive list');
         }
     };
 
@@ -60,18 +72,22 @@ const Home = () => {
         try {
             await api.post(`/lists/${listId}/unarchive`);
             fetchLists();
+            showSuccess('List restored');
         } catch (error) {
             console.error('Error unarchiving list:', error);
+            showError('Failed to restore list');
         }
     };
 
     const displayLists = showArchived ? archivedLists : lists;
 
+    if (isLoading) return <LoadingIndicator fullScreen message="Loading dashboard..." />;
+
     return (
         <div className="pb-20">
             <header className="mb-6 flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Dashboard</h1>
+                    <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Shopping List</h1>
                     <p className="text-gray-500 dark:text-gray-400">Welcome back!</p>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
@@ -87,8 +103,8 @@ const Home = () => {
                             <button
                                 onClick={() => setShowArchived(!showArchived)}
                                 className={`text-sm px-3 py-1 rounded-full transition-colors ${showArchived
-                                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                                        : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                    ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                    : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
                                     }`}
                             >
                                 {showArchived ? 'Show Active' : `Archived (${archivedLists.length})`}
