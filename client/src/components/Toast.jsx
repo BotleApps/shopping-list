@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react';
-import { CheckCircle, AlertCircle, Info, X } from 'lucide-react';
+import React from 'react';
+import { CheckCircle, AlertCircle, Info, X, Undo2 } from 'lucide-react';
 
-const Toast = ({ message, type = 'info', onClose }) => {
+const Toast = ({ message, type = 'info', onClose, undoCallback, onUndo }) => {
     const icons = {
         success: <CheckCircle size={20} className="text-green-500" />,
         error: <AlertCircle size={20} className="text-red-500" />,
@@ -18,7 +18,21 @@ const Toast = ({ message, type = 'info', onClose }) => {
         <div className={`pointer-events-auto flex items-center gap-3 p-4 rounded-xl shadow-lg border-l-4 ${bgColors[type]} animate-slide-up transition-all duration-300`}>
             {icons[type]}
             <p className="flex-1 text-sm font-medium text-gray-700 dark:text-gray-200">{message}</p>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+            {undoCallback && (
+                <button
+                    onClick={onUndo}
+                    className="flex items-center gap-1 px-3 py-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                    aria-label="Undo action"
+                >
+                    <Undo2 size={14} />
+                    Undo
+                </button>
+            )}
+            <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                aria-label="Dismiss notification"
+            >
                 <X size={16} />
             </button>
         </div>
@@ -26,3 +40,4 @@ const Toast = ({ message, type = 'info', onClose }) => {
 };
 
 export default Toast;
+

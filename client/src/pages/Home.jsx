@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
-import { Plus, ShoppingBag, Calendar, MoreVertical, CheckCircle, Archive, ArchiveRestore } from 'lucide-react';
+import { Plus, ShoppingBag, Calendar, Search, Archive, ArchiveRestore, X } from 'lucide-react';
 import LoadingIndicator from '../components/LoadingIndicator';
+import EmptyState from '../components/EmptyState';
 import { useToast } from '../context/ToastContext';
+import { formatRelativeDate } from '../utils/dateHelpers';
 
 const Home = () => {
-    const { showSuccess, showError } = useToast();
+    const { showSuccess, showError, showWithUndo } = useToast();
     const [lists, setLists] = useState([]);
     const [archivedLists, setArchivedLists] = useState([]);
     const [showArchived, setShowArchived] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [newListName, setNewListName] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -54,32 +57,55 @@ const Home = () => {
 
     const handleArchiveList = async (listId, e) => {
         e.stopPropagation();
-        if (!window.confirm('Archive this list? You can restore it later.')) {
-            return;
-        }
+        const listToArchive = lists.find(l => l._id === listId);
+
+        // Optimistically update UI
+        setLists(prev => prev.filter(l => l._id !== listId));
+        setArchivedLists(prev => [{ ...listToArchive, status: 'archived' }, ...prev]);
+
         try {
             await api.post(`/lists/${listId}/archive`);
-            fetchLists();
-            showSuccess('List archived');
+            showWithUndo('List archived', async () => {
+                // Undo: unarchive the list
+                try {
+                    await api.post(`/lists/${listId}/unarchive`);
+                    fetchLists();
+                } catch (err) {
+                    showError('Failed to restore list');
+                }
+            });
         } catch (error) {
             console.error('Error archiving list:', error);
             showError('Failed to archive list');
+            fetchLists(); // Revert on error
         }
     };
 
     const handleUnarchiveList = async (listId, e) => {
         e.stopPropagation();
+        const listToRestore = archivedLists.find(l => l._id === listId);
+
+        // Optimistically update UI
+        setArchivedLists(prev => prev.filter(l => l._id !== listId));
+        setLists(prev => [{ ...listToRestore, status: 'active' }, ...prev]);
+
         try {
             await api.post(`/lists/${listId}/unarchive`);
-            fetchLists();
             showSuccess('List restored');
         } catch (error) {
             console.error('Error unarchiving list:', error);
             showError('Failed to restore list');
+            fetchLists(); // Revert on error
         }
     };
 
-    const displayLists = showArchived ? archivedLists : lists;
+    // Filter lists by search term
+    const filteredLists = (showArchived ? archivedLists : lists).filter(list =>
+        list.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const displayLists = filteredLists;
+    const showSearch = lists.length + archivedLists.length >= 3;
 
     if (isLoading) return <LoadingIndicator fullScreen message="Loading dashboard..." />;
 
@@ -106,27 +132,58 @@ const Home = () => {
                                     ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                                     : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
                                     }`}
+                                aria-label={showArchived ? 'Show active lists' : 'Show archived lists'}
                             >
                                 {showArchived ? 'Show Active' : `Archived (${archivedLists.length})`}
                             </button>
                         )}
                     </div>
-                    <button onClick={() => setIsModalOpen(true)} className="text-primary font-medium flex items-center gap-1">
-                        <Plus size={18} /> New List
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="text-primary font-medium flex items-center gap-1 touch-target"
+                        aria-label="Create new list"
+                    >
+                        <Plus size={18} />
+                        New List
                     </button>
                 </div>
+
+                {/* Search bar - shown when user has multiple lists */}
+                {showSearch && (
+                    <div className="relative mb-4">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Search lists..."
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            aria-label="Search lists"
+                        />
+                        {searchTerm && (
+                            <button
+                                onClick={() => setSearchTerm('')}
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                aria-label="Clear search"
+                            >
+                                <X size={16} />
+                            </button>
+                        )}
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 gap-4">
                     {displayLists.map(list => {
                         const totalItems = list.items.length;
                         const purchasedItems = list.items.filter(i => i.isPurchased).length;
                         const progress = totalItems === 0 ? 0 : (purchasedItems / totalItems) * 100;
+                        const isComplete = progress === 100 && totalItems > 0;
 
                         return (
                             <div
                                 key={list._id}
                                 onClick={() => navigate(`/list/${list._id}`)}
-                                className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 active:scale-98 transition-transform cursor-pointer"
+                                className={`bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 active:scale-98 transition-all cursor-pointer hover:shadow-md ${isComplete ? 'ring-2 ring-green-500 ring-opacity-50' : ''}`}
                             >
                                 <div className="flex justify-between items-start mb-3">
                                     <div className="flex items-center gap-3">
@@ -136,14 +193,16 @@ const Home = () => {
                                         <div>
                                             <h3 className="font-bold text-lg">{list.name}</h3>
                                             <p className="text-xs text-gray-500 flex items-center gap-1">
-                                                <Calendar size={12} /> {new Date(list.createdAt).toLocaleDateString()}
+                                                <Calendar size={12} aria-hidden="true" />
+                                                {formatRelativeDate(list.createdAt)}
                                             </p>
                                         </div>
                                     </div>
                                     <button
                                         onClick={(e) => showArchived ? handleUnarchiveList(list._id, e) : handleArchiveList(list._id, e)}
-                                        className="text-gray-400 hover:text-gray-600 p-2"
+                                        className="text-gray-400 hover:text-gray-600 p-2 touch-target rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                                         title={showArchived ? 'Restore' : 'Archive'}
+                                        aria-label={showArchived ? 'Restore list' : 'Archive list'}
                                     >
                                         {showArchived ? <ArchiveRestore size={20} /> : <Archive size={20} />}
                                     </button>
@@ -151,12 +210,12 @@ const Home = () => {
 
                                 <div className="mt-4">
                                     <div className="flex justify-between text-sm text-gray-500 mb-1">
-                                        <span>Progress</span>
+                                        <span>{isComplete ? '✓ Complete!' : 'Progress'}</span>
                                         <span>{purchasedItems}/{totalItems} items</span>
                                     </div>
                                     <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                                         <div
-                                            className="bg-primary h-full rounded-full transition-all duration-500"
+                                            className={`h-full rounded-full transition-all duration-500 ${isComplete ? 'bg-green-500' : 'bg-primary'}`}
                                             style={{ width: `${progress}%` }}
                                         />
                                     </div>
@@ -164,49 +223,69 @@ const Home = () => {
                             </div>
                         );
                     })}
-                    {displayLists.length === 0 && (
-                        <div className="text-center text-gray-500 py-10">
-                            <p>{showArchived ? 'No archived lists' : 'No active lists'}</p>
-                            {!showArchived && (
-                                <button
-                                    onClick={() => setIsModalOpen(true)}
-                                    className="mt-4 text-blue-600 hover:underline"
-                                >
-                                    Create your first list
-                                </button>
-                            )}
+
+                    {/* Empty state */}
+                    {displayLists.length === 0 && !searchTerm && (
+                        <EmptyState
+                            type="lists"
+                            title={showArchived ? 'No archived lists' : 'No shopping lists yet'}
+                            description={showArchived
+                                ? "Lists you archive will appear here for safekeeping."
+                                : "Create your first shopping list to get started. Keep track of what you need to buy!"}
+                            actionLabel={showArchived ? null : "Create Your First List"}
+                            onAction={showArchived ? null : () => setIsModalOpen(true)}
+                            showTips={!showArchived && lists.length === 0}
+                        />
+                    )}
+
+                    {/* No search results */}
+                    {displayLists.length === 0 && searchTerm && (
+                        <div className="text-center py-10 text-gray-500">
+                            <p>No lists matching "{searchTerm}"</p>
+                            <button
+                                onClick={() => setSearchTerm('')}
+                                className="mt-2 text-blue-600 hover:underline text-sm"
+                            >
+                                Clear search
+                            </button>
                         </div>
                     )}
                 </div>
             </section>
 
+            {/* Create List Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md">
+                <div
+                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in"
+                    onClick={(e) => e.target === e.currentTarget && setIsModalOpen(false)}
+                >
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md animate-scale-in">
                         <h2 className="text-xl font-bold mb-4">Create New List</h2>
                         <form onSubmit={handleCreateList} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium mb-1">List Name</label>
+                                <label htmlFor="listName" className="block text-sm font-medium mb-1">List Name</label>
                                 <input
+                                    id="listName"
                                     type="text"
                                     required
                                     autoFocus
-                                    className="w-full p-2 rounded border dark:bg-gray-700 dark:border-gray-600"
+                                    className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                     value={newListName}
                                     onChange={e => setNewListName(e.target.value)}
+                                    placeholder="e.g., Weekly Groceries"
                                 />
                             </div>
                             <div className="flex gap-2 mt-6">
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="flex-1 py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    className="flex-1 py-3 px-4 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 font-medium transition-colors"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                                    className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors shadow-lg shadow-blue-500/30"
                                 >
                                     Create
                                 </button>
