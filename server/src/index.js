@@ -44,65 +44,49 @@ setupPassport();
 let isConnected = false;
 
 const connectDB = async () => {
-    if (isConnected) {
+    if (isConnected && mongoose.connection.readyState === 1) {
         console.log('Using existing MongoDB connection');
         return;
     }
 
     try {
+        console.log('Connecting to MongoDB...');
         const db = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/shopping-list', {
-            // Optimized settings for serverless environments
-            serverSelectionTimeoutMS: 30000, // Timeout for server selection (30s)
-            socketTimeoutMS: 60000, // Socket timeout (60s)
-            maxPoolSize: 10, // Maximum connection pool size
-            minPoolSize: 1, // Minimum connection pool size
-            maxIdleTimeMS: 60000, // Maximum idle time for connections
-            bufferCommands: true, // Allow buffering commands while connecting
-            connectTimeoutMS: 30000, // Connection timeout (30s)
+            serverSelectionTimeoutMS: 30000,
+            socketTimeoutMS: 60000,
+            maxPoolSize: 10,
+            minPoolSize: 1,
+            maxIdleTimeMS: 60000,
+            bufferCommands: true,
+            connectTimeoutMS: 30000,
         });
 
-        // Also set default timeout for operations
-        mongoose.set('bufferTimeoutMS', 60000); // 60 second buffer timeout
-
+        mongoose.set('bufferTimeoutMS', 60000);
         isConnected = db.connections[0].readyState === 1;
-        console.log('MongoDB connected successfully');
+        console.log('MongoDB connected successfully, state:', mongoose.connection.readyState);
     } catch (err) {
-        console.error('MongoDB connection error:', err);
+        console.error('MongoDB connection error:', err.message);
+        isConnected = false;
         throw err;
     }
 };
 
-// Connect to MongoDB
+// Connect to MongoDB on startup
 connectDB();
 
-// Ensure DB connection before handling requests (middleware)
-app.use(async (req, res, next) => {
-    try {
-        if (!isConnected) {
-            await connectDB();
-        }
-        next();
-    } catch (err) {
-        console.error('DB connection middleware error:', err);
-        res.status(503).json({ message: 'Database connection failed. Please try again.' });
-    }
-});
-
-// Routes
-const authRoutes = require('./routes/auth');
-const apiRoutes = require('./routes/api');
-
-app.use('/api/auth', authRoutes);
-app.use('/api', apiRoutes);
-
+// Root endpoint
 app.get('/', (req, res) => {
     res.send('Shopping List API is running');
 });
 
-// Health check endpoint (also warms up the connection)
+// ============================================
+// PUBLIC ENDPOINTS (No auth required)
+// Must be defined BEFORE apiRoutes
+// ============================================
+
+// Health check endpoint
 app.get('/api/health', async (req, res) => {
     try {
-        // Check if mongoose is connected
         const dbState = mongoose.connection.readyState;
         const states = {
             0: 'disconnected',
@@ -114,7 +98,8 @@ app.get('/api/health', async (req, res) => {
         res.json({
             status: 'ok',
             timestamp: new Date().toISOString(),
-            database: states[dbState] || 'unknown'
+            database: states[dbState] || 'unknown',
+            dbState: dbState
         });
     } catch (err) {
         res.status(500).json({
@@ -156,16 +141,19 @@ app.get('/api/debug/status', async (req, res) => {
         const states = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
         log(`MongoDB state: ${states[dbState]} (${dbState})`);
 
+        // Try to connect if not connected
+        if (dbState !== 1) {
+            log('Attempting to connect to MongoDB...');
+            await connectDB();
+            log(`Connection attempt complete, new state: ${mongoose.connection.readyState}`);
+        }
+
         // Try a simple query if connected
-        if (dbState === 1) {
+        if (mongoose.connection.readyState === 1) {
             log('Testing database query...');
             const User = require('./models/User');
             const userCount = await User.countDocuments();
             log(`User count: ${userCount}`);
-        } else {
-            log('Attempting to connect to MongoDB...');
-            await connectDB();
-            log('Connection established');
         }
 
         const totalTime = Date.now() - startTime;
@@ -187,6 +175,16 @@ app.get('/api/debug/status', async (req, res) => {
         });
     }
 });
+
+// ============================================
+// PROTECTED ROUTES (Auth required)
+// ============================================
+
+const authRoutes = require('./routes/auth');
+const apiRoutes = require('./routes/api');
+
+app.use('/api/auth', authRoutes);
+app.use('/api', apiRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
