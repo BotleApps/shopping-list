@@ -4,6 +4,7 @@ import api from '../api/axios';
 import { Plus, Search, Edit2, Trash2, Tag, Clock, FileText, X, Package } from 'lucide-react';
 import LoadingIndicator from '../components/LoadingIndicator';
 import EmptyState from '../components/EmptyState';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { useToast } from '../context/ToastContext';
 import { getRunOutPrediction } from '../utils/dateHelpers';
 
@@ -14,6 +15,8 @@ const MasterList = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [filterCategory, setFilterCategory] = useState('all');
+    const [deleteConfirm, setDeleteConfirm] = useState({ open: false, product: null });
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const categories = ['all', 'Fruits & Veggies', 'Dairy & Eggs', 'Bakery', 'Meat & Seafood', 'Pantry', 'Snacks', 'Beverages', 'Household', 'Personal Care', 'Other'];
 
@@ -34,11 +37,16 @@ const MasterList = () => {
         }
     };
 
-    const handleDeleteProduct = async (id) => {
-        const productToDelete = products.find(p => p._id === id);
+    const handleDeleteProduct = async () => {
+        if (!deleteConfirm.product) return;
+        const productToDelete = deleteConfirm.product;
+        const id = productToDelete._id;
+
+        setIsDeleting(true);
 
         // Optimistic update
         setProducts(prev => prev.filter(p => p._id !== id));
+        setDeleteConfirm({ open: false, product: null });
 
         try {
             await api.delete(`/products/${id}`);
@@ -55,6 +63,8 @@ const MasterList = () => {
             console.error('Error deleting product:', error);
             showError('Failed to delete product');
             fetchProducts(); // Revert on error
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -125,8 +135,8 @@ const MasterList = () => {
                             key={cat}
                             onClick={() => setFilterCategory(cat)}
                             className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filterCategory === cat
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                                 }`}
                         >
                             {cat === 'all' ? 'All' : cat}
@@ -246,7 +256,7 @@ const MasterList = () => {
                                                     <Edit2 size={20} />
                                                 </button>
                                                 <button
-                                                    onClick={() => handleDeleteProduct(product._id)}
+                                                    onClick={() => setDeleteConfirm({ open: true, product })}
                                                     className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-lg transition-colors touch-target"
                                                     aria-label={`Delete ${product.name}`}
                                                 >
@@ -261,6 +271,19 @@ const MasterList = () => {
                     ))
                 )}
             </div>
+
+            {/* Delete Confirmation Dialog */}
+            <ConfirmDialog
+                isOpen={deleteConfirm.open}
+                onClose={() => setDeleteConfirm({ open: false, product: null })}
+                onConfirm={handleDeleteProduct}
+                title="Delete Product?"
+                message={`Are you sure you want to delete "${deleteConfirm.product?.name}"? This action cannot be undone.`}
+                confirmText="Delete"
+                cancelText="Cancel"
+                type="danger"
+                isLoading={isDeleting}
+            />
         </div>
     );
 };

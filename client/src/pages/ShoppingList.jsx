@@ -26,6 +26,8 @@ const ShoppingList = () => {
     const [showActionsMenu, setShowActionsMenu] = useState(false);
     const [quickAddText, setQuickAddText] = useState('');
     const [showConfetti, setShowConfetti] = useState(false);
+    const [addingItemId, setAddingItemId] = useState(null); // Track which item is being added
+    const [isQuickAdding, setIsQuickAdding] = useState(false);
     const prevProgressRef = useRef(0);
     const quickAddRef = useRef(null);
 
@@ -74,6 +76,8 @@ const ShoppingList = () => {
     };
 
     const handleAddItem = async (productId) => {
+        if (addingItemId) return; // Prevent double-clicks
+        setAddingItemId(productId);
         try {
             await api.post(`/lists/${list._id}/items`, { productId, quantity: 1 });
             const response = await api.get(`/lists/${list._id}`);
@@ -83,6 +87,8 @@ const ShoppingList = () => {
         } catch (error) {
             console.error('Error adding item:', error);
             showError('Failed to add item');
+        } finally {
+            setAddingItemId(null);
         }
     };
 
@@ -340,8 +346,8 @@ const ShoppingList = () => {
                         <button
                             onClick={() => setShowSortMenu(!showSortMenu)}
                             className={`flex items-center gap-1 text-sm px-3 py-2 rounded-xl border transition-colors touch-target ${sortBy !== 'default'
-                                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800'
-                                    : 'text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+                                : 'text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
                                 }`}
                             aria-label="Sort options"
                             aria-expanded={showSortMenu}
@@ -478,8 +484,8 @@ const ShoppingList = () => {
                                         <button
                                             onClick={() => handleTogglePurchased(item._id, item.isPurchased)}
                                             className={`mt-1 p-1.5 rounded-full border-2 transition-all touch-target flex items-center justify-center ${item.isPurchased
-                                                    ? 'bg-green-500 border-green-500 text-white animate-pulse-success'
-                                                    : 'border-gray-300 dark:border-gray-600 text-transparent hover:border-green-500'
+                                                ? 'bg-green-500 border-green-500 text-white animate-pulse-success'
+                                                : 'border-gray-300 dark:border-gray-600 text-transparent hover:border-green-500'
                                                 }`}
                                             aria-label={item.isPurchased ? 'Mark as not purchased' : 'Mark as purchased'}
                                         >
@@ -617,7 +623,11 @@ const ShoppingList = () => {
                                 <button
                                     key={product._id}
                                     onClick={() => handleAddItem(product._id)}
-                                    className="w-full p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg border border-gray-100 dark:border-gray-700 transition-colors"
+                                    disabled={addingItemId === product._id}
+                                    className={`w-full p-3 text-left rounded-lg border border-gray-100 dark:border-gray-700 transition-all ${addingItemId === product._id
+                                        ? 'opacity-60 cursor-wait bg-blue-50 dark:bg-blue-900/20'
+                                        : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
                                 >
                                     <div className="flex justify-between items-start mb-1">
                                         <div>
@@ -626,7 +636,11 @@ const ShoppingList = () => {
                                                 <p className="text-xs text-gray-500 italic">{product.alias}</p>
                                             )}
                                         </div>
-                                        <Plus size={20} className="text-blue-600 dark:text-blue-400" />
+                                        {addingItemId === product._id ? (
+                                            <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                            <Plus size={20} className="text-blue-600 dark:text-blue-400" />
+                                        )}
                                     </div>
                                     <div className="flex flex-wrap gap-1 text-xs mt-2">
                                         <span className="bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">

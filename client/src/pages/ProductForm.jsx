@@ -137,11 +137,11 @@ const ProductForm = () => {
                             <div>
                                 <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Category</label>
                                 <select
-                                    className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                                    className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-base"
                                     value={product.category}
                                     onChange={e => setProduct({ ...product, category: e.target.value })}
                                 >
-                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                    {categories.map(c => <option key={c} value={c} className="text-base py-2">{c}</option>)}
                                 </select>
                             </div>
                         </div>
@@ -172,24 +172,27 @@ const ProductForm = () => {
                         </div>
 
                         <div className="flex flex-col gap-3 mt-6">
-                            <button
-                                type="submit"
-                                className="w-full bg-primary text-white p-4 rounded-xl flex flex-col items-center justify-center gap-1 font-bold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 active:scale-98 transition-all"
-                                aria-label="Save with basic info only"
-                            >
-                                <span className="flex items-center gap-2">
-                                    <Save size={20} />
-                                    Save Basics Only
-                                </span>
-                                <span className="text-xs font-normal opacity-80">Name, category, and quantity</span>
-                            </button>
+                            {/* Primary action - Add More Details */}
                             <button
                                 type="button"
                                 onClick={() => setStep(2)}
-                                className="w-full bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 p-4 rounded-xl flex items-center justify-center gap-2 font-semibold border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
+                                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-xl flex items-center justify-center gap-2 font-bold shadow-lg shadow-purple-500/30 hover:shadow-purple-500/40 active:scale-98 transition-all"
                                 aria-label="Continue to add more details"
                             >
                                 Add More Details →
+                            </button>
+
+                            {/* Secondary action - Quick Save */}
+                            <button
+                                type="submit"
+                                className="w-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 p-4 rounded-xl flex flex-col items-center justify-center gap-1 font-medium border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
+                                aria-label="Save with basic info only"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <Save size={18} />
+                                    Save Basics Only
+                                </span>
+                                <span className="text-xs font-normal text-gray-500">Skip optional details</span>
                             </button>
                         </div>
                     </>

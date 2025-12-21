@@ -12,6 +12,7 @@ import MasterList from './pages/MasterList';
 import Settings from './pages/Settings';
 import EditProfile from './pages/EditProfile';
 import PrivacySecurity from './pages/PrivacySecurity';
+import About from './pages/About';
 import ProductForm from './pages/ProductForm';
 import NotFound from './pages/NotFound';
 
@@ -64,6 +65,11 @@ function App() {
               <Route path="/settings/security" element={
                 <ProtectedRoute>
                   <Layout><PrivacySecurity /></Layout>
+                </ProtectedRoute>
+              } />
+              <Route path="/settings/about" element={
+                <ProtectedRoute>
+                  <Layout><About /></Layout>
                 </ProtectedRoute>
               } />
 

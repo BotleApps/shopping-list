@@ -4,6 +4,7 @@ import { User, Moon, Globe, ChevronRight, LogOut, Bell, Shield, HelpCircle, Info
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const Settings = () => {
     const navigate = useNavigate();
@@ -14,6 +15,7 @@ const Settings = () => {
         return localStorage.getItem('notifications') === 'true';
     });
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
     const handleNotificationToggle = () => {
         const newValue = !notificationsEnabled;
@@ -22,13 +24,14 @@ const Settings = () => {
         showInfo(newValue ? 'Notifications enabled' : 'Notifications disabled');
     };
 
-    const handleLogout = async () => {
+    const handleLogoutConfirm = async () => {
         setIsLoggingOut(true);
         try {
             await logout();
         } catch (err) {
             console.error('Logout error:', err);
             setIsLoggingOut(false);
+            setShowLogoutConfirm(false);
         }
     };
 
@@ -114,20 +117,32 @@ const Settings = () => {
                         icon={<Info size={20} />}
                         title="About"
                         description="Version 1.0.0"
-                        onClick={() => showInfo('Shopping List App v1.0.0')}
+                        onClick={() => navigate('/settings/about')}
                     />
                 </Section>
 
                 <button
-                    onClick={handleLogout}
-                    disabled={isLoggingOut}
-                    className="w-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl flex items-center justify-center gap-2 font-semibold mt-8 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors touch-target disabled:opacity-50"
+                    onClick={() => setShowLogoutConfirm(true)}
+                    className="w-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl flex items-center justify-center gap-2 font-semibold mt-8 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors touch-target"
                     aria-label="Log out"
                 >
                     <LogOut size={20} />
-                    {isLoggingOut ? 'Logging out...' : 'Log Out'}
+                    Log Out
                 </button>
             </div>
+
+            {/* Logout Confirmation Dialog */}
+            <ConfirmDialog
+                isOpen={showLogoutConfirm}
+                onClose={() => setShowLogoutConfirm(false)}
+                onConfirm={handleLogoutConfirm}
+                title="Log Out?"
+                message="Are you sure you want to log out? You'll need to sign in again to access your lists."
+                confirmText="Log Out"
+                cancelText="Stay"
+                type="logout"
+                isLoading={isLoggingOut}
+            />
         </div>
     );
 };

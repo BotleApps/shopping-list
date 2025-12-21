@@ -243,62 +243,83 @@ router.post('/ai/suggest', async (req, res) => {
     try {
         const products = await Product.find({ user: req.user._id });
 
+        // If no products, return empty suggestions
+        if (!products || products.length === 0) {
+            return res.json({
+                suggestions: [],
+                message: 'Add products to your master list to get AI suggestions'
+            });
+        }
+
         // If no API key is configured (or using mock), perform a simple heuristic or mock response
         if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === "mock-key") {
-            // Mock Logic: Suggest items that have a default quantity > 0 and are not in the current list (simplified)
-            const shuffled = products.sort(() => 0.5 - Math.random());
-            const suggestions = shuffled.slice(0, 3).map(p => ({
+            // Mock Logic: Suggest random items from the product list
+            const shuffled = [...products].sort(() => 0.5 - Math.random());
+            const numSuggestions = Math.min(3, products.length);
+            const suggestions = shuffled.slice(0, numSuggestions).map(p => ({
                 product: p._id,
-                reason: "Based on your monthly consumption habits (Mock AI)"
+                reason: `Based on your shopping habits - typically consumed every ${p.consumptionDuration || 7} days`
             }));
             return res.json({ suggestions });
         }
 
         // Real AI Logic
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        try {
+            const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-        const productList = products.map(p =>
-            `- ${p.name} (Brand: ${p.brand || 'N/A'}, Avg Monthly: ${p.averageMonthlyConsumption} ${p.unit})`
-        ).join('\n');
+            const productList = products.map(p =>
+                `- ${p.name} (Brand: ${p.brand || 'N/A'}, Avg Monthly: ${p.averageMonthlyConsumption} ${p.unit})`
+            ).join('\n');
 
-        const prompt = `
-      I have a master list of grocery items with their average monthly consumption. 
-      Please suggest a shopping list for this week based on this data.
-      Return the result as a JSON array of objects, where each object has:
-      - "productName": The exact name of the product from the list
-      - "reason": A brief reason for the suggestion
-      
-      Master List:
-      ${productList}
-      
-      Output JSON only, no markdown formatting.
-    `;
+            const prompt = `
+          I have a master list of grocery items with their average monthly consumption. 
+          Please suggest a shopping list for this week based on this data.
+          Return the result as a JSON array of objects, where each object has:
+          - "productName": The exact name of the product from the list
+          - "reason": A brief reason for the suggestion
+          
+          Master List:
+          ${productList}
+          
+          Output JSON only, no markdown formatting.
+        `;
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            const text = response.text();
 
-        // Clean up markdown code blocks if present
-        const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const suggestionsData = JSON.parse(jsonStr);
+            // Clean up markdown code blocks if present
+            const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            const suggestionsData = JSON.parse(jsonStr);
 
-        // Map back to Product IDs
-        const suggestions = [];
-        for (const item of suggestionsData) {
-            const product = products.find(p => p.name === item.productName);
-            if (product) {
-                suggestions.push({
-                    product: product._id,
-                    reason: item.reason
-                });
+            // Map back to Product IDs
+            const suggestions = [];
+            for (const item of suggestionsData) {
+                const product = products.find(p => p.name === item.productName);
+                if (product) {
+                    suggestions.push({
+                        product: product._id,
+                        reason: item.reason
+                    });
+                }
             }
-        }
 
-        res.json({ suggestions });
+            res.json({ suggestions });
+        } catch (aiError) {
+            console.error("Gemini AI Error:", aiError);
+            // Fallback to mock suggestions if AI fails
+            const shuffled = [...products].sort(() => 0.5 - Math.random());
+            const numSuggestions = Math.min(3, products.length);
+            const suggestions = shuffled.slice(0, numSuggestions).map(p => ({
+                product: p._id,
+                reason: `Recommended based on your shopping patterns`
+            }));
+            return res.json({ suggestions, fallback: true });
+        }
 
     } catch (err) {
         console.error("AI Error:", err);
-        res.status(500).json({ message: "Failed to generate suggestions" });
+        res.status(500).json({ message: "Failed to generate suggestions", error: err.message });
     }
 });
 
