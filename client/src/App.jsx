@@ -13,6 +13,7 @@ import Settings from './pages/Settings';
 import EditProfile from './pages/EditProfile';
 import PrivacySecurity from './pages/PrivacySecurity';
 import ProductForm from './pages/ProductForm';
+import NotFound from './pages/NotFound';
 
 function App() {
   return (
@@ -65,6 +66,9 @@ function App() {
                   <Layout><PrivacySecurity /></Layout>
                 </ProtectedRoute>
               } />
+
+              {/* 404 Not Found - Catch all unmatched routes */}
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </Router>
         </AuthProvider>

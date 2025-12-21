@@ -14,6 +14,7 @@ const setupPassport = () => {
             const user = await User.findById(id);
             done(null, user);
         } catch (err) {
+            console.error('Deserialize error:', err);
             done(err, null);
         }
     });
@@ -26,25 +27,32 @@ const setupPassport = () => {
         scope: ['profile', 'email']
     }, async (accessToken, refreshToken, profile, done) => {
         try {
+            console.log('Google OAuth callback received for:', profile.emails?.[0]?.value);
+
             // Check if user already exists
             let user = await User.findOne({ googleId: profile.id });
 
             if (user) {
+                console.log('Existing user found:', user.email);
                 // Update last login
                 await user.updateLastLogin();
                 return done(null, user);
             }
+
+            console.log('Creating new user for:', profile.emails?.[0]?.value);
 
             // Create new user
             user = await User.create({
                 googleId: profile.id,
                 email: profile.emails[0].value,
                 name: profile.displayName,
-                picture: profile.photos[0]?.value
+                picture: profile.photos?.[0]?.value
             });
 
+            console.log('New user created:', user.email);
             done(null, user);
         } catch (err) {
+            console.error('Google OAuth error:', err);
             done(err, null);
         }
     }));
