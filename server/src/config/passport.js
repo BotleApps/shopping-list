@@ -1,6 +1,23 @@
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const mongoose = require('mongoose');
 const User = require('../models/User');
+
+// Helper to wait for DB connection
+const waitForConnection = async (maxWaitMs = 30000) => {
+    const startTime = Date.now();
+
+    while (mongoose.connection.readyState !== 1) {
+        if (Date.now() - startTime > maxWaitMs) {
+            throw new Error('Database connection timeout');
+        }
+        // Wait 500ms before checking again
+        await new Promise(resolve => setTimeout(resolve, 500));
+        console.log('Waiting for MongoDB connection... State:', mongoose.connection.readyState);
+    }
+
+    return true;
+};
 
 const setupPassport = () => {
     // Serialize user into session
@@ -11,6 +28,7 @@ const setupPassport = () => {
     // Deserialize user from session
     passport.deserializeUser(async (id, done) => {
         try {
+            await waitForConnection();
             const user = await User.findById(id);
             done(null, user);
         } catch (err) {
@@ -28,6 +46,11 @@ const setupPassport = () => {
     }, async (accessToken, refreshToken, profile, done) => {
         try {
             console.log('Google OAuth callback received for:', profile.emails?.[0]?.value);
+
+            // Wait for database connection before proceeding
+            console.log('Waiting for database connection...');
+            await waitForConnection();
+            console.log('Database connected, proceeding with user lookup');
 
             // Check if user already exists
             let user = await User.findOne({ googleId: profile.id });

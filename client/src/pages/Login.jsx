@@ -1,15 +1,65 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ShoppingBag, LogIn } from 'lucide-react';
+import { ShoppingBag, RefreshCw, AlertCircle } from 'lucide-react';
 
 const Login = () => {
     const { loginWithGoogle, loading, isAuthenticated } = useAuth();
+    const [error, setError] = useState(null);
+    const [isRetrying, setIsRetrying] = useState(false);
+
+    // Check for error in URL params
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const errorType = params.get('error');
+        const errorMessage = params.get('message');
+
+        if (errorType) {
+            // Clean the URL
+            window.history.replaceState({}, '', '/login');
+
+            // Set user-friendly error message
+            if (errorMessage?.includes('timeout') || errorMessage?.includes('buffering')) {
+                setError({
+                    title: 'Connection Slow',
+                    message: 'The server is warming up. Please try again in a moment.',
+                    canRetry: true
+                });
+            } else if (errorType === 'auth_failed') {
+                setError({
+                    title: 'Authentication Failed',
+                    message: 'Could not sign in with Google. Please try again.',
+                    canRetry: true
+                });
+            } else {
+                setError({
+                    title: 'Something Went Wrong',
+                    message: errorMessage || 'Please try signing in again.',
+                    canRetry: true
+                });
+            }
+        }
+    }, []);
 
     // If already authenticated, redirect to home
     if (isAuthenticated) {
         window.location.href = '/';
         return null;
     }
+
+    const handleLogin = () => {
+        setError(null);
+        loginWithGoogle();
+    };
+
+    const handleRetry = async () => {
+        setIsRetrying(true);
+        setError(null);
+
+        // Small delay before retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        loginWithGoogle();
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
@@ -23,6 +73,29 @@ const Login = () => {
                     <p className="text-gray-500 dark:text-gray-400 mt-2">Organize your shopping, simplify your life</p>
                 </div>
 
+                {/* Error Message */}
+                {error && (
+                    <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl p-4 mb-6">
+                        <div className="flex items-start gap-3">
+                            <AlertCircle className="text-orange-500 flex-shrink-0 mt-0.5" size={20} />
+                            <div className="flex-1">
+                                <h3 className="font-semibold text-orange-700 dark:text-orange-400">{error.title}</h3>
+                                <p className="text-sm text-orange-600 dark:text-orange-400/80 mt-1">{error.message}</p>
+                            </div>
+                        </div>
+                        {error.canRetry && (
+                            <button
+                                onClick={handleRetry}
+                                disabled={isRetrying}
+                                className="w-full mt-4 flex items-center justify-center gap-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 py-2 rounded-lg font-medium hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors disabled:opacity-50"
+                            >
+                                <RefreshCw size={16} className={isRetrying ? 'animate-spin' : ''} />
+                                {isRetrying ? 'Retrying...' : 'Try Again'}
+                            </button>
+                        )}
+                    </div>
+                )}
+
                 {/* Login Card */}
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
                     <h2 className="text-xl font-semibold text-center text-gray-800 dark:text-white mb-6">
@@ -35,8 +108,8 @@ const Login = () => {
 
                     {/* Google Sign In Button */}
                     <button
-                        onClick={loginWithGoogle}
-                        disabled={loading}
+                        onClick={handleLogin}
+                        disabled={loading || isRetrying}
                         className="w-full flex items-center justify-center gap-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl px-6 py-4 text-gray-700 dark:text-gray-200 font-medium hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {/* Google Icon SVG */}
@@ -61,8 +134,13 @@ const Login = () => {
                         <span>Continue with Google</span>
                     </button>
 
+                    {/* Helper text for cold start */}
+                    <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-4">
+                        First login may take a few seconds to connect
+                    </p>
+
                     {/* Terms */}
-                    <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-6">
+                    <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-4">
                         By continuing, you agree to our Terms of Service and Privacy Policy
                     </p>
                 </div>
