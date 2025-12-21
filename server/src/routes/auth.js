@@ -117,4 +117,55 @@ router.get('/debug', (req, res) => {
     });
 });
 
+// @route   GET /api/auth/diagnostic
+// @desc    Full diagnostic endpoint with timing info
+router.get('/diagnostic', async (req, res) => {
+    const mongoose = require('mongoose');
+    const startTime = Date.now();
+    const logs = [];
+
+    const log = (msg) => {
+        const elapsed = Date.now() - startTime;
+        logs.push(`[${elapsed}ms] ${msg}`);
+        console.log(`[DIAG ${elapsed}ms] ${msg}`);
+    };
+
+    log('Starting diagnostic');
+
+    try {
+        // Check MongoDB connection state
+        const dbState = mongoose.connection.readyState;
+        const states = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+        log(`MongoDB state: ${states[dbState]} (${dbState})`);
+
+        // If connected, try a query
+        if (dbState === 1) {
+            log('Testing database query...');
+            const User = require('../models/User');
+            const userCount = await User.countDocuments();
+            log(`User count: ${userCount}`);
+        } else {
+            log('Database not connected, skipping query test');
+        }
+
+        const totalTime = Date.now() - startTime;
+        log(`Diagnostic complete in ${totalTime}ms`);
+
+        res.json({
+            status: 'ok',
+            totalTimeMs: totalTime,
+            database: states[dbState],
+            dbState: dbState,
+            logs: logs
+        });
+    } catch (err) {
+        log(`Error: ${err.message}`);
+        res.status(500).json({
+            status: 'error',
+            error: err.message,
+            logs: logs
+        });
+    }
+});
+
 module.exports = router;
