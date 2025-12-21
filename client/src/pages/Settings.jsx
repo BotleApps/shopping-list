@@ -3,14 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { User, Moon, Globe, ChevronRight, LogOut, Bell, Shield, HelpCircle, Info } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 
 const Settings = () => {
     const navigate = useNavigate();
     const { theme, toggleTheme } = useTheme();
     const { showInfo } = useToast();
+    const { user, logout } = useAuth();
     const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
         return localStorage.getItem('notifications') === 'true';
     });
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     const handleNotificationToggle = () => {
         const newValue = !notificationsEnabled;
@@ -19,8 +22,14 @@ const Settings = () => {
         showInfo(newValue ? 'Notifications enabled' : 'Notifications disabled');
     };
 
-    const handleLogout = () => {
-        showInfo('Logout functionality coming soon!');
+    const handleLogout = async () => {
+        setIsLoggingOut(true);
+        try {
+            await logout();
+        } catch (err) {
+            console.error('Logout error:', err);
+            setIsLoggingOut(false);
+        }
     };
 
     return (
@@ -28,12 +37,21 @@ const Settings = () => {
             <h1 className="text-3xl font-bold mb-6">Settings</h1>
 
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm mb-6 flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                    U
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-2xl font-bold shadow-lg overflow-hidden">
+                    {user?.picture ? (
+                        <img
+                            src={user.picture}
+                            alt={user.name}
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                        />
+                    ) : (
+                        user?.name?.charAt(0) || 'U'
+                    )}
                 </div>
                 <div className="flex-1">
-                    <h2 className="text-xl font-bold">User</h2>
-                    <p className="text-gray-500 text-sm">Manage your profile</p>
+                    <h2 className="text-xl font-bold">{user?.name || 'User'}</h2>
+                    <p className="text-gray-500 text-sm">{user?.email || 'Manage your profile'}</p>
                 </div>
                 <button
                     onClick={() => navigate('/settings/profile')}
@@ -102,11 +120,12 @@ const Settings = () => {
 
                 <button
                     onClick={handleLogout}
-                    className="w-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl flex items-center justify-center gap-2 font-semibold mt-8 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors touch-target"
+                    disabled={isLoggingOut}
+                    className="w-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl flex items-center justify-center gap-2 font-semibold mt-8 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors touch-target disabled:opacity-50"
                     aria-label="Log out"
                 >
                     <LogOut size={20} />
-                    Log Out
+                    {isLoggingOut ? 'Logging out...' : 'Log Out'}
                 </button>
             </div>
         </div>

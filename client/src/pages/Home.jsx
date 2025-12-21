@@ -5,10 +5,12 @@ import { Plus, ShoppingBag, Calendar, Search, Archive, ArchiveRestore, X } from 
 import LoadingIndicator from '../components/LoadingIndicator';
 import EmptyState from '../components/EmptyState';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import { formatRelativeDate } from '../utils/dateHelpers';
 
 const Home = () => {
     const { showSuccess, showError, showWithUndo } = useToast();
+    const { user } = useAuth();
     const [lists, setLists] = useState([]);
     const [archivedLists, setArchivedLists] = useState([]);
     const [showArchived, setShowArchived] = useState(false);
@@ -114,10 +116,10 @@ const Home = () => {
             <header className="mb-6 flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Shopping List</h1>
-                    <p className="text-gray-500 dark:text-gray-400">Welcome back!</p>
+                    <p className="text-gray-500 dark:text-gray-400">Welcome back{user?.name ? `, ${user.name.split(' ')[0]}` : ''}!</p>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Profile" />
+                    <img src={user?.picture || 'https://api.dicebear.com/7.x/avataaars/svg?seed=User'} alt="Profile" referrerPolicy="no-referrer" />
                 </div>
             </header>
 

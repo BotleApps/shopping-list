@@ -12,7 +12,11 @@ const listSchema = new mongoose.Schema({
     type: { type: String, default: 'Regular' }, // e.g., Weekly, Monthly, Party
     items: [listItemSchema],
     status: { type: String, enum: ['active', 'completed', 'archived'], default: 'active' },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     createdAt: { type: Date, default: Date.now },
 });
+
+// Index for efficient queries by user
+listSchema.index({ user: 1, createdAt: -1 });
 
 module.exports = mongoose.model('List', listSchema);

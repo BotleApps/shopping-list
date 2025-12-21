@@ -7,6 +7,22 @@ const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
+    withCredentials: true, // Important: Send cookies with requests
 });
+
+// Response interceptor for handling auth errors
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            // Redirect to login if unauthorized
+            const currentPath = window.location.pathname;
+            if (currentPath !== '/login') {
+                window.location.href = '/login?redirect=' + encodeURIComponent(currentPath);
+            }
+        }
+        return Promise.reject(error);
+    }
+);
 
 export default api;

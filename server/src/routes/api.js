@@ -2,13 +2,17 @@ const express = require('express');
 const router = express.Router();
 const Product = require('../models/Product');
 const List = require('../models/List');
+const { isAuthenticated } = require('../middleware/auth');
+
+// Apply authentication to all routes
+router.use(isAuthenticated);
 
 // --- Product Routes ---
 
-// Get all products (Master List)
+// Get all products (Master List) for authenticated user
 router.get('/products', async (req, res) => {
     try {
-        const products = await Product.find().sort({ name: 1 });
+        const products = await Product.find({ user: req.user._id }).sort({ name: 1 });
         res.json(products);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -17,7 +21,10 @@ router.get('/products', async (req, res) => {
 
 // Add a new product
 router.post('/products', async (req, res) => {
-    const product = new Product(req.body);
+    const product = new Product({
+        ...req.body,
+        user: req.user._id
+    });
     try {
         const newProduct = await product.save();
         res.status(201).json(newProduct);
@@ -29,7 +36,14 @@ router.post('/products', async (req, res) => {
 // Update a product
 router.patch('/products/:id', async (req, res) => {
     try {
-        const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const product = await Product.findOneAndUpdate(
+            { _id: req.params.id, user: req.user._id },
+            req.body,
+            { new: true }
+        );
+        if (!product) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
         res.json(product);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -39,7 +53,10 @@ router.patch('/products/:id', async (req, res) => {
 // Delete a product
 router.delete('/products/:id', async (req, res) => {
     try {
-        await Product.findByIdAndDelete(req.params.id);
+        const result = await Product.findOneAndDelete({ _id: req.params.id, user: req.user._id });
+        if (!result) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
         res.json({ message: 'Product deleted' });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -48,10 +65,10 @@ router.delete('/products/:id', async (req, res) => {
 
 // --- List Routes ---
 
-// Get all active lists
+// Get all lists for authenticated user
 router.get('/lists', async (req, res) => {
     try {
-        const lists = await List.find({ status: { $ne: 'archived' } }).sort({ createdAt: -1 });
+        const lists = await List.find({ user: req.user._id }).sort({ createdAt: -1 });
         res.json(lists);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -62,7 +79,8 @@ router.get('/lists', async (req, res) => {
 router.post('/lists', async (req, res) => {
     const list = new List({
         name: req.body.name || 'New Shopping List',
-        type: req.body.type || 'Regular'
+        type: req.body.type || 'Regular',
+        user: req.user._id
     });
     try {
         const newList = await list.save();
@@ -74,12 +92,12 @@ router.post('/lists', async (req, res) => {
 
 // Get active shopping list (Legacy support / Default)
 router.get('/lists/active', async (req, res) => {
-    console.log("Hit /lists/active");
     try {
-        // Find the most recent active list
-        let list = await List.findOne({ status: 'active' }).sort({ createdAt: -1 }).populate('items.product');
+        let list = await List.findOne({ user: req.user._id, status: 'active' })
+            .sort({ createdAt: -1 })
+            .populate('items.product');
         if (!list) {
-            list = new List({ name: 'My Shopping List' });
+            list = new List({ name: 'My Shopping List', user: req.user._id });
             await list.save();
         }
         res.json(list);
@@ -91,7 +109,8 @@ router.get('/lists/active', async (req, res) => {
 // Get specific list
 router.get('/lists/:id', async (req, res) => {
     try {
-        const list = await List.findById(req.params.id).populate('items.product');
+        const list = await List.findOne({ _id: req.params.id, user: req.user._id })
+            .populate('items.product');
         if (!list) return res.status(404).json({ message: 'List not found' });
         res.json(list);
     } catch (err) {
@@ -102,7 +121,7 @@ router.get('/lists/:id', async (req, res) => {
 // Archive a list
 router.post('/lists/:id/archive', async (req, res) => {
     try {
-        const list = await List.findById(req.params.id);
+        const list = await List.findOne({ _id: req.params.id, user: req.user._id });
         if (!list) return res.status(404).json({ message: 'List not found' });
 
         list.status = 'archived';
@@ -116,7 +135,7 @@ router.post('/lists/:id/archive', async (req, res) => {
 // Unarchive a list
 router.post('/lists/:id/unarchive', async (req, res) => {
     try {
-        const list = await List.findById(req.params.id);
+        const list = await List.findOne({ _id: req.params.id, user: req.user._id });
         if (!list) return res.status(404).json({ message: 'List not found' });
 
         list.status = 'active';
@@ -130,8 +149,18 @@ router.post('/lists/:id/unarchive', async (req, res) => {
 // Add item to list
 router.post('/lists/:id/items', async (req, res) => {
     try {
-        const list = await List.findById(req.params.id);
+        const list = await List.findOne({ _id: req.params.id, user: req.user._id });
+        if (!list) return res.status(404).json({ message: 'List not found' });
+
         const { productId, quantity, customName } = req.body;
+
+        // Verify product belongs to user if productId is provided
+        if (productId) {
+            const product = await Product.findOne({ _id: productId, user: req.user._id });
+            if (!product) {
+                return res.status(404).json({ message: 'Product not found' });
+            }
+        }
 
         // Check if item already exists
         const existingItemIndex = list.items.findIndex(item =>
@@ -146,7 +175,7 @@ router.post('/lists/:id/items', async (req, res) => {
         }
 
         await list.save();
-        const updatedList = await List.findById(req.params.id).populate('items.product');
+        const updatedList = await List.findById(list._id).populate('items.product');
         res.json(updatedList);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -156,13 +185,17 @@ router.post('/lists/:id/items', async (req, res) => {
 // Update item in list (quantity, purchased status)
 router.patch('/lists/:id/items/:itemId', async (req, res) => {
     try {
-        const list = await List.findById(req.params.id);
+        const list = await List.findOne({ _id: req.params.id, user: req.user._id });
+        if (!list) return res.status(404).json({ message: 'List not found' });
+
         const item = list.items.id(req.params.itemId);
+        if (!item) return res.status(404).json({ message: 'Item not found' });
+
         if (req.body.quantity) item.quantity = req.body.quantity;
         if (req.body.isPurchased !== undefined) item.isPurchased = req.body.isPurchased;
 
         await list.save();
-        const updatedList = await List.findById(req.params.id).populate('items.product');
+        const updatedList = await List.findById(list._id).populate('items.product');
         res.json(updatedList);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -172,10 +205,12 @@ router.patch('/lists/:id/items/:itemId', async (req, res) => {
 // Remove item from list
 router.delete('/lists/:id/items/:itemId', async (req, res) => {
     try {
-        const list = await List.findById(req.params.id);
+        const list = await List.findOne({ _id: req.params.id, user: req.user._id });
+        if (!list) return res.status(404).json({ message: 'List not found' });
+
         list.items.pull(req.params.itemId);
         await list.save();
-        const updatedList = await List.findById(req.params.id).populate('items.product');
+        const updatedList = await List.findById(list._id).populate('items.product');
         res.json(updatedList);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -185,10 +220,12 @@ router.delete('/lists/:id/items/:itemId', async (req, res) => {
 // Clear completed items
 router.post('/lists/:id/clear-completed', async (req, res) => {
     try {
-        const list = await List.findById(req.params.id);
+        const list = await List.findOne({ _id: req.params.id, user: req.user._id });
+        if (!list) return res.status(404).json({ message: 'List not found' });
+
         list.items = list.items.filter(item => !item.isPurchased);
         await list.save();
-        const updatedList = await List.findById(req.params.id).populate('items.product');
+        const updatedList = await List.findById(list._id).populate('items.product');
         res.json(updatedList);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -204,12 +241,11 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "mock-key");
 
 router.post('/ai/suggest', async (req, res) => {
     try {
-        const products = await Product.find();
+        const products = await Product.find({ user: req.user._id });
 
         // If no API key is configured (or using mock), perform a simple heuristic or mock response
         if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === "mock-key") {
             // Mock Logic: Suggest items that have a default quantity > 0 and are not in the current list (simplified)
-            // In a real mock, we might just pick 3 random items.
             const shuffled = products.sort(() => 0.5 - Math.random());
             const suggestions = shuffled.slice(0, 3).map(p => ({
                 product: p._id,

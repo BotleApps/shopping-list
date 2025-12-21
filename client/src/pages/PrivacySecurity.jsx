@@ -1,96 +1,171 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Lock, Eye, Trash2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Shield, Download, Trash2, Lock, Eye, AlertTriangle } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
 const PrivacySecurity = () => {
     const navigate = useNavigate();
-    const { showError } = useToast();
+    const { user, logout } = useAuth();
+    const { showInfo, showError } = useToast();
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-    const handleDeleteAccount = () => {
-        if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-            showError('Account deletion is not implemented in this demo');
-        }
+    const handleExportData = () => {
+        showInfo('Data export will be available soon!');
+    };
+
+    const handleDeleteAccount = async () => {
+        // In production, this would call an API to delete the account
+        showInfo('Account deletion will be available soon. Please contact support.');
+        setShowDeleteConfirm(false);
     };
 
     return (
         <div className="pb-20">
             <header className="mb-6 flex items-center gap-4">
-                <button onClick={() => navigate('/settings')} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
+                <button
+                    onClick={() => navigate('/settings')}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full touch-target"
+                    aria-label="Go back"
+                >
                     <ArrowLeft size={24} />
                 </button>
                 <h1 className="text-2xl font-bold">Privacy & Security</h1>
             </header>
 
-            <div className="space-y-6">
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl flex items-start gap-3">
-                    <Shield className="text-blue-600 dark:text-blue-400 shrink-0 mt-1" size={24} />
+            {/* Security Status */}
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800 mb-6">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full">
+                        <Shield size={24} className="text-green-600 dark:text-green-400" />
+                    </div>
                     <div>
-                        <h3 className="font-bold text-blue-800 dark:text-blue-300">Your account is secure</h3>
-                        <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
-                            We use industry-standard encryption to protect your data. No suspicious activity detected.
+                        <h4 className="font-medium text-green-700 dark:text-green-400">Account Secured</h4>
+                        <p className="text-sm text-green-600 dark:text-green-400/80">
+                            Your account is protected with Google Sign-In
                         </p>
-                    </div>
-                </div>
-
-                <div className="space-y-4">
-                    <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider ml-1">Security</h3>
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-                        <div className="flex items-start gap-4">
-                            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full text-green-600 dark:text-green-400">
-                                <Lock size={24} />
-                            </div>
-                            <div>
-                                <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Data Protection</h4>
-                                <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                                    We implement robust security measures to safeguard your personal information.
-                                    All sensitive data is encrypted at rest and in transit. We regularly audit our
-                                    systems to ensure your shopping lists and preferences remain private and secure.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="space-y-4">
-                    <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider ml-1">Privacy</h3>
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-                        <div className="flex items-start gap-4">
-                            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full text-purple-600 dark:text-purple-400">
-                                <Eye size={24} />
-                            </div>
-                            <div>
-                                <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Your Data, Your Control</h4>
-                                <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                                    We respect your privacy. We do not sell your personal data to third parties.
-                                    Your shopping habits are analyzed solely to provide you with smart suggestions
-                                    and improve your app experience. You retain full ownership of your data.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="pt-8">
-                    <div className="bg-red-50 dark:bg-red-900/10 rounded-xl p-4 border border-red-100 dark:border-red-900/30">
-                        <h3 className="font-bold text-red-700 dark:text-red-400 flex items-center gap-2 mb-2">
-                            <AlertTriangle size={20} /> Danger Zone
-                        </h3>
-                        <p className="text-sm text-red-600 dark:text-red-400/80 mb-4">
-                            Deleting your account will permanently remove all your lists, preferences, and data. This action cannot be undone.
-                        </p>
-                        <button
-                            onClick={handleDeleteAccount}
-                            className="w-full py-3 px-4 bg-white dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg font-medium hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors flex items-center justify-center gap-2"
-                        >
-                            <Trash2 size={18} />
-                            Delete Account
-                        </button>
                     </div>
                 </div>
             </div>
+
+            {/* Security Features */}
+            <div className="space-y-6">
+                <Section title="Authentication">
+                    <SettingRow
+                        icon={<Lock size={20} />}
+                        title="Google Sign-In"
+                        description={`Signed in as ${user?.email || 'unknown'}`}
+                        badge="Active"
+                        badgeColor="green"
+                    />
+                </Section>
+
+                <Section title="Data Privacy">
+                    <SettingRow
+                        icon={<Eye size={20} />}
+                        title="Data Storage"
+                        description="Your data is securely stored in the cloud"
+                    />
+                    <SettingRow
+                        icon={<Download size={20} />}
+                        title="Export My Data"
+                        description="Download a copy of your shopping lists and products"
+                        onClick={handleExportData}
+                        actionable
+                    />
+                </Section>
+
+                <Section title="Account Management">
+                    <div
+                        className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-xl border border-red-200 dark:border-red-800 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        onClick={() => setShowDeleteConfirm(true)}
+                        role="button"
+                        tabIndex={0}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="text-red-500">
+                                <Trash2 size={20} />
+                            </div>
+                            <div>
+                                <span className="font-medium text-red-600 dark:text-red-400 block">Delete Account</span>
+                                <span className="text-xs text-red-500/80">Permanently delete your account and all data</span>
+                            </div>
+                        </div>
+                    </div>
+                </Section>
+            </div>
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteConfirm && (
+                <div
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                    onClick={(e) => e.target === e.currentTarget && setShowDeleteConfirm(false)}
+                >
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-sm animate-scale-in">
+                        <div className="flex items-center gap-3 mb-4 text-red-500">
+                            <AlertTriangle size={24} />
+                            <h3 className="text-xl font-bold">Delete Account?</h3>
+                        </div>
+                        <p className="text-gray-600 dark:text-gray-400 mb-6">
+                            This action cannot be undone. All your shopping lists, products, and preferences will be permanently deleted.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowDeleteConfirm(false)}
+                                className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-gray-700 font-medium hover:bg-gray-50 dark:hover:bg-gray-700"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDeleteAccount}
+                                className="flex-1 py-3 rounded-xl bg-red-600 text-white font-medium hover:bg-red-700"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
+
+const Section = ({ title, children }) => (
+    <div>
+        <h3 className="text-sm font-medium text-gray-500 mb-3 uppercase tracking-wider">{title}</h3>
+        <div className="space-y-3">
+            {children}
+        </div>
+    </div>
+);
+
+const SettingRow = ({ icon, title, description, badge, badgeColor, onClick, actionable }) => (
+    <div
+        className={`flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 ${actionable ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700' : ''} transition-colors`}
+        onClick={onClick}
+        role={actionable ? 'button' : undefined}
+        tabIndex={actionable ? 0 : undefined}
+    >
+        <div className="flex items-center gap-3">
+            <div className="text-gray-500 dark:text-gray-400">
+                {icon}
+            </div>
+            <div>
+                <span className="font-medium text-gray-800 dark:text-gray-100 block">{title}</span>
+                {description && (
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{description}</span>
+                )}
+            </div>
+        </div>
+        {badge && (
+            <span className={`text-xs font-medium px-2 py-1 rounded-full ${badgeColor === 'green'
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                }`}>
+                {badge}
+            </span>
+        )}
+    </div>
+);
 
 export default PrivacySecurity;
