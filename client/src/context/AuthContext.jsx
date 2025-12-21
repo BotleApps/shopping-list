@@ -20,14 +20,28 @@ export const AuthProvider = ({ children }) => {
     const checkAuth = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await api.get('/auth/status');
+
+            // Add timeout to prevent infinite loading
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+            const response = await api.get('/auth/status', {
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
             if (response.data.authenticated) {
                 setUser(response.data.user);
             } else {
                 setUser(null);
             }
         } catch (err) {
-            console.error('Auth check failed:', err);
+            if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+                console.error('Auth check timed out');
+            } else {
+                console.error('Auth check failed:', err);
+            }
             setUser(null);
         } finally {
             setLoading(false);
@@ -35,15 +49,15 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     useEffect(() => {
-        checkAuth();
-
-        // Check for auth success parameter in URL
+        // Check for auth success parameter in URL first
         const params = new URLSearchParams(window.location.search);
         if (params.get('auth') === 'success') {
-            // Remove the query parameter and refresh auth
+            // Remove the query parameter
             window.history.replaceState({}, '', window.location.pathname);
-            checkAuth();
         }
+
+        // Then check auth status
+        checkAuth();
     }, [checkAuth]);
 
     // Login with Google - redirects to backend OAuth
@@ -62,6 +76,7 @@ export const AuthProvider = ({ children }) => {
             console.error('Logout failed:', err);
             // Still clear user state even if API call fails
             setUser(null);
+            window.location.href = '/login';
         }
     };
 
