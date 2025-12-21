@@ -21,9 +21,9 @@ export const AuthProvider = ({ children }) => {
         try {
             setLoading(true);
 
-            // Add timeout to prevent infinite loading
+            // Add timeout to prevent infinite loading (30 seconds for cold starts)
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
             const response = await api.get('/auth/status', {
                 signal: controller.signal

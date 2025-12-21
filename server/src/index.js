@@ -40,10 +40,49 @@ app.use(passport.initialize());
 app.use(passport.session());
 setupPassport();
 
-// Database Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/shopping-list')
-    .then(() => console.log('MongoDB connected'))
-    .catch(err => console.error('MongoDB connection error:', err));
+// MongoDB connection with optimized settings for serverless
+let isConnected = false;
+
+const connectDB = async () => {
+    if (isConnected) {
+        console.log('Using existing MongoDB connection');
+        return;
+    }
+
+    try {
+        const db = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/shopping-list', {
+            // Optimized settings for serverless environments
+            serverSelectionTimeoutMS: 25000, // Timeout for server selection (25s)
+            socketTimeoutMS: 45000, // Socket timeout (45s)
+            maxPoolSize: 10, // Maximum connection pool size
+            minPoolSize: 1, // Minimum connection pool size
+            maxIdleTimeMS: 30000, // Maximum idle time for connections
+            // bufferCommands: false, // Disable buffering
+        });
+
+        isConnected = db.connections[0].readyState === 1;
+        console.log('MongoDB connected successfully');
+    } catch (err) {
+        console.error('MongoDB connection error:', err);
+        throw err;
+    }
+};
+
+// Connect to MongoDB
+connectDB();
+
+// Ensure DB connection before handling requests (middleware)
+app.use(async (req, res, next) => {
+    try {
+        if (!isConnected) {
+            await connectDB();
+        }
+        next();
+    } catch (err) {
+        console.error('DB connection middleware error:', err);
+        res.status(503).json({ message: 'Database connection failed. Please try again.' });
+    }
+});
 
 // Routes
 const authRoutes = require('./routes/auth');
@@ -56,9 +95,29 @@ app.get('/', (req, res) => {
     res.send('Shopping List API is running');
 });
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check endpoint (also warms up the connection)
+app.get('/api/health', async (req, res) => {
+    try {
+        // Check if mongoose is connected
+        const dbState = mongoose.connection.readyState;
+        const states = {
+            0: 'disconnected',
+            1: 'connected',
+            2: 'connecting',
+            3: 'disconnecting'
+        };
+
+        res.json({
+            status: 'ok',
+            timestamp: new Date().toISOString(),
+            database: states[dbState] || 'unknown'
+        });
+    } catch (err) {
+        res.status(500).json({
+            status: 'error',
+            message: err.message
+        });
+    }
 });
 
 // Error handling middleware
