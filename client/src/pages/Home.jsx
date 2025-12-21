@@ -118,9 +118,13 @@ const Home = () => {
                     <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Shopping List</h1>
                     <p className="text-gray-500 dark:text-gray-400">Welcome back{user?.name ? `, ${user.name.split(' ')[0]}` : ''}!</p>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-                    <img src={user?.picture || 'https://api.dicebear.com/7.x/avataaars/svg?seed=User'} alt="Profile" referrerPolicy="no-referrer" />
-                </div>
+                <button
+                    onClick={() => navigate('/settings/profile')}
+                    className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all"
+                    aria-label="View profile"
+                >
+                    <img src={user?.picture || 'https://api.dicebear.com/7.x/avataaars/svg?seed=User'} alt="Profile" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                </button>
             </header>
 
             <section className="mb-8">

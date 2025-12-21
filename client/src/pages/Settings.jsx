@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Moon, Globe, ChevronRight, LogOut, Bell, Shield, HelpCircle, Info } from 'lucide-react';
+import { User, Moon, Globe, ChevronRight, LogOut, Bell, Shield, HelpCircle, Info, Check, X } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -9,13 +9,15 @@ import ConfirmDialog from '../components/ConfirmDialog';
 const Settings = () => {
     const navigate = useNavigate();
     const { theme, toggleTheme } = useTheme();
-    const { showInfo } = useToast();
+    const { showInfo, showSuccess } = useToast();
     const { user, logout } = useAuth();
     const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
         return localStorage.getItem('notifications') === 'true';
     });
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+    const [showLanguageModal, setShowLanguageModal] = useState(false);
+    const [selectedLanguage, setSelectedLanguage] = useState('English');
 
     const handleNotificationToggle = () => {
         const newValue = !notificationsEnabled;
@@ -78,8 +80,9 @@ const Settings = () => {
                     <SettingItem
                         icon={<Globe size={20} />}
                         title="Language"
-                        value="English"
+                        value={selectedLanguage}
                         description="App display language"
+                        onClick={() => setShowLanguageModal(true)}
                     />
                     <SettingItem
                         icon={<Bell size={20} />}
@@ -111,7 +114,7 @@ const Settings = () => {
                         icon={<HelpCircle size={20} />}
                         title="Help & FAQ"
                         description="Get answers to common questions"
-                        onClick={() => showInfo('Help center coming soon!')}
+                        onClick={() => navigate('/settings/help')}
                     />
                     <SettingItem
                         icon={<Info size={20} />}
@@ -137,12 +140,54 @@ const Settings = () => {
                 onClose={() => setShowLogoutConfirm(false)}
                 onConfirm={handleLogoutConfirm}
                 title="Log Out?"
-                message="Are you sure you want to log out? You'll need to sign in again to access your lists."
+                message="Are you sure you want to log out? You'll be signed out from your Google account and can choose a different account when signing back in."
                 confirmText="Log Out"
                 cancelText="Stay"
                 type="logout"
                 isLoading={isLoggingOut}
             />
+
+            {/* Language Selection Modal */}
+            {showLanguageModal && (
+                <div
+                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in"
+                    onClick={(e) => e.target === e.currentTarget && setShowLanguageModal(false)}
+                >
+                    <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-sm animate-scale-in">
+                        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                            <h3 className="text-lg font-semibold">Select Language</h3>
+                            <button
+                                onClick={() => setShowLanguageModal(false)}
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-2">
+                            <button
+                                onClick={() => {
+                                    setSelectedLanguage('English');
+                                    setShowLanguageModal(false);
+                                    showSuccess('Language set to English');
+                                }}
+                                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <span className="text-2xl">🇺🇸</span>
+                                    <span className="font-medium">English</span>
+                                </div>
+                                {selectedLanguage === 'English' && (
+                                    <Check size={20} className="text-green-500" />
+                                )}
+                            </button>
+                            {/* More languages can be added here in the future */}
+                            <div className="p-4 text-center text-sm text-gray-400">
+                                More languages coming soon!
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

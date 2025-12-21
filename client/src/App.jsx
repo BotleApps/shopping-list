@@ -13,6 +13,7 @@ import Settings from './pages/Settings';
 import EditProfile from './pages/EditProfile';
 import PrivacySecurity from './pages/PrivacySecurity';
 import About from './pages/About';
+import Help from './pages/Help';
 import ProductForm from './pages/ProductForm';
 import NotFound from './pages/NotFound';
 
@@ -70,6 +71,11 @@ function App() {
               <Route path="/settings/about" element={
                 <ProtectedRoute>
                   <Layout><About /></Layout>
+                </ProtectedRoute>
+              } />
+              <Route path="/settings/help" element={
+                <ProtectedRoute>
+                  <Layout><Help /></Layout>
                 </ProtectedRoute>
               } />
 

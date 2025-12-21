@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShoppingBag, Heart, Code, Coffee, Github, Mail, Star } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, Heart, Code, Coffee, Mail } from 'lucide-react';
 
 const About = () => {
     const navigate = useNavigate();
@@ -81,10 +81,6 @@ const About = () => {
             {/* Links */}
             <div className="flex flex-col gap-3 mt-8">
                 <button className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <Star size={18} className="text-yellow-500" />
-                    <span>Rate This App</span>
-                </button>
-                <button className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                     <Mail size={18} className="text-blue-500" />
                     <span>Send Feedback</span>
                 </button>
@@ -92,7 +88,7 @@ const About = () => {
 
             {/* Footer */}
             <div className="mt-8 text-center text-sm text-gray-400">
-                <p>© 2024 Shopping List App</p>
+                <p>© 2026 Shopping List App</p>
                 <p className="mt-1">All rights reserved</p>
             </div>
         </div>

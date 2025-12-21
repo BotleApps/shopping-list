@@ -66,17 +66,19 @@ export const AuthProvider = ({ children }) => {
         window.location.href = `${apiUrl}/api/auth/google`;
     };
 
-    // Logout
+    // Logout - completely signs out from Google to allow account selection on next login
     const logout = async () => {
         try {
             await api.post('/auth/logout');
             setUser(null);
-            window.location.href = '/login';
+            // Redirect to Google's logout URL to completely sign out from Google
+            // This forces users to re-authenticate and choose an account on next login
+            window.location.href = 'https://accounts.google.com/logout?continue=https://accounts.google.com/AccountChooser?continue=' + encodeURIComponent(window.location.origin + '/login');
         } catch (err) {
             console.error('Logout failed:', err);
             // Still clear user state even if API call fails
             setUser(null);
-            window.location.href = '/login';
+            window.location.href = 'https://accounts.google.com/logout?continue=https://accounts.google.com/AccountChooser?continue=' + encodeURIComponent(window.location.origin + '/login');
         }
     };
 
