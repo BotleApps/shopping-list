@@ -62,7 +62,7 @@ export const AuthProvider = ({ children }) => {
 
     // Login with Google - redirects to backend OAuth
     const loginWithGoogle = () => {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         window.location.href = `${apiUrl}/api/auth/google`;
     };
 
