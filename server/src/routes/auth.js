@@ -30,15 +30,31 @@ router.get('/google/callback', (req, res, next) => {
             // Generate JWT token
             const token = generateToken(user);
 
+            // Log callback headers and the user being signed in (avoid logging token)
+            try {
+                console.log('OAuth callback headers:', {
+                    origin: req.headers.origin,
+                    referer: req.headers.referer,
+                    host: req.headers.host
+                });
+            } catch (e) {
+                console.log('Failed to log callback headers:', e && e.message ? e.message : e);
+            }
+
+            console.log('Setting auth cookie for user:', user.email, 'uid:', user._id.toString());
+
             // Set HTTP-only cookie
+            // Use SameSite=None so the cookie is sent on cross-origin XHR requests
+            // In production browsers require Secure for SameSite=None — keep secure true in production only
             res.cookie('token', token, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+                sameSite: 'none',
                 maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
             });
 
             // Redirect to frontend with success
+            console.log('Redirecting to client after auth success:', `${CLIENT_URL}?auth=success`);
             res.redirect(`${CLIENT_URL}?auth=success`);
         } catch (tokenError) {
             console.error('Token generation error:', tokenError);
@@ -61,10 +77,16 @@ router.get('/me', isAuthenticated, (req, res) => {
 // @route   POST /api/auth/logout
 // @desc    Logout user
 router.post('/logout', (req, res) => {
+    try {
+        console.log('Clearing auth cookie. Request cookies:', req.cookies || {});
+    } catch (e) {
+        console.log('Failed to log cookies on logout:', e && e.message ? e.message : e);
+    }
+
     res.clearCookie('token', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+        sameSite: 'none'
     });
     res.json({ message: 'Logged out successfully' });
 });
