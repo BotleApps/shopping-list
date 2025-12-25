@@ -41,38 +41,56 @@ app.use(passport.session());
 setupPassport();
 
 // MongoDB connection with optimized settings for serverless
-let isConnected = false;
+// Set buffer timeout BEFORE connecting to avoid 10s default timeout
+mongoose.set('bufferTimeoutMS', 60000); // 60 seconds for cold starts
+
+let connectionPromise = null;
 
 const connectDB = async () => {
-    if (isConnected && mongoose.connection.readyState === 1) {
+    // If already connected, return immediately
+    if (mongoose.connection.readyState === 1) {
         console.log('Using existing MongoDB connection');
         return;
     }
 
-    try {
-        console.log('Connecting to MongoDB...');
-        const db = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/shopping-list', {
-            serverSelectionTimeoutMS: 30000,
-            socketTimeoutMS: 60000,
-            maxPoolSize: 10,
-            minPoolSize: 1,
-            maxIdleTimeMS: 60000,
-            bufferCommands: true,
-            connectTimeoutMS: 30000,
-        });
-
-        mongoose.set('bufferTimeoutMS', 60000);
-        isConnected = db.connections[0].readyState === 1;
-        console.log('MongoDB connected successfully, state:', mongoose.connection.readyState);
-    } catch (err) {
-        console.error('MongoDB connection error:', err.message);
-        isConnected = false;
-        throw err;
+    // If currently connecting, wait for the existing connection attempt
+    if (connectionPromise) {
+        console.log('Waiting for existing connection attempt...');
+        return connectionPromise;
     }
+
+    // Start new connection
+    connectionPromise = (async () => {
+        try {
+            console.log('Connecting to MongoDB...');
+
+            await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/shopping-list', {
+                serverSelectionTimeoutMS: 30000, // 30 seconds to find a server
+                socketTimeoutMS: 60000,          // 60 seconds for socket operations
+                maxPoolSize: 10,
+                minPoolSize: 1,
+                maxIdleTimeMS: 60000,
+                connectTimeoutMS: 30000,         // 30 seconds to establish connection
+                heartbeatFrequencyMS: 10000,     // Check server health every 10s
+                retryWrites: true,
+                retryReads: true,
+            });
+
+            console.log('MongoDB connected successfully, state:', mongoose.connection.readyState);
+        } catch (err) {
+            console.error('MongoDB connection error:', err.message);
+            connectionPromise = null; // Reset so we can retry
+            throw err;
+        }
+    })();
+
+    return connectionPromise;
 };
 
-// Connect to MongoDB on startup
-connectDB();
+// Connect to MongoDB on startup (don't await - let it run in background)
+connectDB().catch(err => {
+    console.error('Initial MongoDB connection failed:', err.message);
+});
 
 // Root endpoint
 app.get('/', (req, res) => {
