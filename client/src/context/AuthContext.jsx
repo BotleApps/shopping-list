@@ -16,6 +16,26 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // Process URL params synchronously on initial load (before first render completes)
+    // This ensures the token is stored before ProtectedRoute checks auth
+    const processedUrlRef = React.useRef(false);
+    if (!processedUrlRef.current && typeof window !== 'undefined') {
+        processedUrlRef.current = true;
+        const params = new URLSearchParams(window.location.search);
+        const tokenFromUrl = params.get('token');
+        const authSuccess = params.get('auth') === 'success';
+        
+        if (tokenFromUrl) {
+            console.log('[AuthContext] Token found in URL, storing to localStorage');
+            localStorage.setItem('auth_token', tokenFromUrl);
+        }
+        
+        if (authSuccess) {
+            // Clean URL immediately
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+    }
+
     // Check authentication status on mount
     const checkAuth = useCallback(async () => {
         try {
@@ -49,24 +69,8 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     useEffect(() => {
-        // Check for auth success parameter in URL first
-        const params = new URLSearchParams(window.location.search);
-        const authSuccess = params.get('auth') === 'success';
-        const tokenFromUrl = params.get('token');
-
-        // If we have a token in the URL (fallback for mobile browsers that block cookies)
-        // Store it in localStorage for future requests
-        if (authSuccess && tokenFromUrl) {
-            console.log('Received token via URL fallback (mobile browser cookie workaround)');
-            localStorage.setItem('auth_token', tokenFromUrl);
-        }
-
-        if (authSuccess) {
-            // Remove the query parameters (token and auth)
-            window.history.replaceState({}, '', window.location.pathname);
-        }
-
-        // Then check auth status
+        // URL params are already processed synchronously in the provider initialization
+        // Just check auth status
         checkAuth();
     }, [checkAuth]);
 

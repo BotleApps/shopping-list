@@ -108,7 +108,16 @@ router.post('/logout', (req, res) => {
 // @desc    Check authentication status
 router.get('/status', async (req, res) => {
     try {
-        const token = req.cookies?.token;
+        // Check for token in cookie first, then Authorization header (mobile fallback)
+        let token = req.cookies?.token;
+        
+        // Fallback: Check Authorization header (for mobile browsers that block cookies)
+        if (!token) {
+            const authHeader = req.headers.authorization;
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+                token = authHeader.substring(7);
+            }
+        }
 
         if (!token) {
             return res.json({ authenticated: false });
