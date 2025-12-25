@@ -3,40 +3,9 @@ const passport = require('passport');
 const mongoose = require('mongoose');
 const router = express.Router();
 const { generateToken, isAuthenticated } = require('../middleware/auth');
+const dbConnect = require('../lib/dbConnect');
 
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
-
-// Helper to get DB connection (uses global cache)
-const getConnection = async () => {
-    const cached = global.mongoose;
-    if (cached && cached.conn) {
-        return cached.conn;
-    }
-
-    const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/shopping-list';
-    const opts = {
-        bufferCommands: false,
-        serverSelectionTimeoutMS: 10000,
-        socketTimeoutMS: 45000,
-        maxPoolSize: 10,
-        minPoolSize: 0,
-        maxIdleTimeMS: 10000,
-        connectTimeoutMS: 10000,
-        retryWrites: true,
-        retryReads: true,
-    };
-
-    if (!global.mongoose) {
-        global.mongoose = { conn: null, promise: null };
-    }
-
-    if (!global.mongoose.promise) {
-        global.mongoose.promise = mongoose.connect(MONGODB_URI, opts);
-    }
-
-    global.mongoose.conn = await global.mongoose.promise;
-    return global.mongoose.conn;
-};
 
 // @route   GET /api/auth/google
 // @desc    Initiate Google OAuth
@@ -148,8 +117,8 @@ router.get('/status', async (req, res) => {
         const jwt = require('jsonwebtoken');
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'shopping-list-secret-key');
 
-        // Ensure DB connection before querying
-        await getConnection();
+        // CRITICAL: Ensure DB connection before querying
+        await dbConnect();
 
         const User = require('../models/User');
         const user = await User.findById(decoded.userId);
@@ -210,7 +179,7 @@ router.get('/diagnostic', async (req, res) => {
 
         // Try to establish connection
         log('Attempting to connect...');
-        await getConnection();
+        await dbConnect();
         log(`Connection established, state: ${mongoose.connection.readyState}`);
 
         // Test database query

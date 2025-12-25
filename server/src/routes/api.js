@@ -3,6 +3,7 @@ const router = express.Router();
 const Product = require('../models/Product');
 const List = require('../models/List');
 const { isAuthenticated } = require('../middleware/auth');
+const dbConnect = require('../lib/dbConnect');
 
 // Apply authentication to all routes
 router.use(isAuthenticated);
@@ -12,6 +13,7 @@ router.use(isAuthenticated);
 // Get all products (Master List) for authenticated user
 router.get('/products', async (req, res) => {
     try {
+        await dbConnect();
         const products = await Product.find({ user: req.user._id }).sort({ name: 1 });
         res.json(products);
     } catch (err) {

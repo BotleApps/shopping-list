@@ -1,43 +1,7 @@
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const mongoose = require('mongoose');
 const User = require('../models/User');
-
-// Get the cached connection from index.js
-const getConnection = async () => {
-    // Access the global cached connection
-    const cached = global.mongoose;
-
-    if (cached && cached.conn) {
-        return cached.conn;
-    }
-
-    // If no cached connection, create one
-    const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/shopping-list';
-
-    const opts = {
-        bufferCommands: false,
-        serverSelectionTimeoutMS: 10000,
-        socketTimeoutMS: 45000,
-        maxPoolSize: 10,
-        minPoolSize: 0,
-        maxIdleTimeMS: 10000,
-        connectTimeoutMS: 10000,
-        retryWrites: true,
-        retryReads: true,
-    };
-
-    if (!cached) {
-        global.mongoose = { conn: null, promise: null };
-    }
-
-    if (!global.mongoose.promise) {
-        global.mongoose.promise = mongoose.connect(MONGODB_URI, opts);
-    }
-
-    global.mongoose.conn = await global.mongoose.promise;
-    return global.mongoose.conn;
-};
+const dbConnect = require('../lib/dbConnect');
 
 const setupPassport = () => {
     // Serialize user into session
@@ -48,7 +12,7 @@ const setupPassport = () => {
     // Deserialize user from session
     passport.deserializeUser(async (id, done) => {
         try {
-            await getConnection();
+            await dbConnect();
             const user = await User.findById(id);
             done(null, user);
         } catch (err) {
@@ -69,9 +33,9 @@ const setupPassport = () => {
         try {
             console.log('Google OAuth callback received for:', profile.emails?.[0]?.value);
 
-            // Ensure database is connected before proceeding
-            console.log('Ensuring database connection...');
-            await getConnection();
+            // CRITICAL: Ensure database is connected BEFORE any mongoose operation
+            console.log('Connecting to database...');
+            await dbConnect();
             console.log('Database connected in', Date.now() - startTime, 'ms');
 
             // Check if user already exists

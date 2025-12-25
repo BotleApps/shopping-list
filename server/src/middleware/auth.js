@@ -1,38 +1,6 @@
 const jwt = require('jsonwebtoken');
-const mongoose = require('mongoose');
 const User = require('../models/User');
-
-// Helper to get DB connection (uses global cache)
-const getConnection = async () => {
-    const cached = global.mongoose;
-    if (cached && cached.conn) {
-        return cached.conn;
-    }
-
-    const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/shopping-list';
-    const opts = {
-        bufferCommands: false,
-        serverSelectionTimeoutMS: 10000,
-        socketTimeoutMS: 45000,
-        maxPoolSize: 10,
-        minPoolSize: 0,
-        maxIdleTimeMS: 10000,
-        connectTimeoutMS: 10000,
-        retryWrites: true,
-        retryReads: true,
-    };
-
-    if (!global.mongoose) {
-        global.mongoose = { conn: null, promise: null };
-    }
-
-    if (!global.mongoose.promise) {
-        global.mongoose.promise = mongoose.connect(MONGODB_URI, opts);
-    }
-
-    global.mongoose.conn = await global.mongoose.promise;
-    return global.mongoose.conn;
-};
+const dbConnect = require('../lib/dbConnect');
 
 // Middleware to check if user is authenticated via JWT
 const isAuthenticated = async (req, res, next) => {
@@ -54,8 +22,8 @@ const isAuthenticated = async (req, res, next) => {
         // Verify token
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'shopping-list-secret-key');
 
-        // Ensure DB connection before querying
-        await getConnection();
+        // CRITICAL: Ensure DB connection before querying
+        await dbConnect();
 
         // Get user from database
         const user = await User.findById(decoded.userId);
@@ -93,8 +61,8 @@ const optionalAuth = async (req, res, next) => {
         if (token) {
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'shopping-list-secret-key');
 
-            // Ensure DB connection before querying
-            await getConnection();
+            // CRITICAL: Ensure DB connection before querying
+            await dbConnect();
 
             const user = await User.findById(decoded.userId);
             if (user) {
