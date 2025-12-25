@@ -35,7 +35,8 @@ router.get('/google/callback', (req, res, next) => {
                 console.log('OAuth callback headers:', {
                     origin: req.headers.origin,
                     referer: req.headers.referer,
-                    host: req.headers.host
+                    host: req.headers.host,
+                    userAgent: req.headers['user-agent']
                 });
             } catch (e) {
                 console.log('Failed to log callback headers:', e && e.message ? e.message : e);
@@ -43,19 +44,29 @@ router.get('/google/callback', (req, res, next) => {
 
             console.log('Setting auth cookie for user:', user.email, 'uid:', user._id.toString());
 
-            // Set HTTP-only cookie
-            // Use SameSite=None so the cookie is sent on cross-origin XHR requests
-            // In production browsers require Secure for SameSite=None — keep secure true in production only
-            res.cookie('token', token, {
+            // Cookie options for cross-origin authentication
+            // SameSite=None + Secure is required for cross-origin cookies
+            // Partitioned helps with modern browser cookie restrictions (CHIPS)
+            const cookieOptions = {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
+                secure: true, // Always true for SameSite=None
                 sameSite: 'none',
-                maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-            });
+                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+                path: '/',
+            };
 
-            // Redirect to frontend with success
+            // Add partitioned attribute for CHIPS support (Chrome 114+)
+            // This helps with third-party cookie restrictions
+            if (process.env.NODE_ENV === 'production') {
+                cookieOptions.partitioned = true;
+            }
+
+            res.cookie('token', token, cookieOptions);
+
+            // Redirect to frontend with success and token in URL as fallback
+            // Mobile browsers may block cross-site cookies, so we include token in URL
             console.log('Redirecting to client after auth success:', `${CLIENT_URL}?auth=success`);
-            res.redirect(`${CLIENT_URL}?auth=success`);
+            res.redirect(`${CLIENT_URL}?auth=success&token=${encodeURIComponent(token)}`);
         } catch (tokenError) {
             console.error('Token generation error:', tokenError);
             return res.redirect(`${CLIENT_URL}/login?error=token_error`);

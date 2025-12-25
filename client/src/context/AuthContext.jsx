@@ -51,8 +51,18 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         // Check for auth success parameter in URL first
         const params = new URLSearchParams(window.location.search);
-        if (params.get('auth') === 'success') {
-            // Remove the query parameter
+        const authSuccess = params.get('auth') === 'success';
+        const tokenFromUrl = params.get('token');
+
+        // If we have a token in the URL (fallback for mobile browsers that block cookies)
+        // Store it in localStorage for future requests
+        if (authSuccess && tokenFromUrl) {
+            console.log('Received token via URL fallback (mobile browser cookie workaround)');
+            localStorage.setItem('auth_token', tokenFromUrl);
+        }
+
+        if (authSuccess) {
+            // Remove the query parameters (token and auth)
             window.history.replaceState({}, '', window.location.pathname);
         }
 
@@ -71,6 +81,8 @@ export const AuthProvider = ({ children }) => {
         try {
             await api.post('/auth/logout');
             setUser(null);
+            // Clear localStorage token (used as fallback for mobile browsers)
+            localStorage.removeItem('auth_token');
             // Redirect to Google's logout URL to completely sign out from Google
             // This forces users to re-authenticate and choose an account on next login
             window.location.href = 'https://accounts.google.com/logout?continue=https://accounts.google.com/AccountChooser?continue=' + encodeURIComponent(window.location.origin + '/login');
@@ -78,6 +90,8 @@ export const AuthProvider = ({ children }) => {
             console.error('Logout failed:', err);
             // Still clear user state even if API call fails
             setUser(null);
+            // Clear localStorage token
+            localStorage.removeItem('auth_token');
             window.location.href = 'https://accounts.google.com/logout?continue=https://accounts.google.com/AccountChooser?continue=' + encodeURIComponent(window.location.origin + '/login');
         }
     };
