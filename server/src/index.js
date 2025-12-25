@@ -40,56 +40,105 @@ app.use(passport.initialize());
 app.use(passport.session());
 setupPassport();
 
-// MongoDB connection with optimized settings for serverless
-// Set buffer timeout BEFORE connecting to avoid 10s default timeout
-mongoose.set('bufferTimeoutMS', 60000); // 60 seconds for cold starts
+// ============================================
+// MongoDB Connection for Serverless (Vercel)
+// ============================================
+// Key fixes for serverless:
+// 1. Cache connection across warm invocations
+// 2. Disable mongoose buffering - fail fast instead of timeout
+// 3. Ensure connection before any DB operation
 
-let connectionPromise = null;
+// Disable buffering - operations will fail immediately if not connected
+// This prevents the 10s buffering timeout issue
+mongoose.set('bufferCommands', false);
+
+// Cache the connection promise globally (survives across warm function invocations)
+let cached = global.mongoose;
+
+if (!cached) {
+    cached = global.mongoose = { conn: null, promise: null };
+}
 
 const connectDB = async () => {
-    // If already connected, return immediately
-    if (mongoose.connection.readyState === 1) {
-        console.log('Using existing MongoDB connection');
-        return;
+    // Return cached connection if available
+    if (cached.conn) {
+        return cached.conn;
     }
 
-    // If currently connecting, wait for the existing connection attempt
-    if (connectionPromise) {
-        console.log('Waiting for existing connection attempt...');
-        return connectionPromise;
+    // If a connection is in progress, wait for it
+    if (cached.promise) {
+        cached.conn = await cached.promise;
+        return cached.conn;
     }
 
-    // Start new connection
-    connectionPromise = (async () => {
-        try {
-            console.log('Connecting to MongoDB...');
+    const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/shopping-list';
 
-            await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/shopping-list', {
-                serverSelectionTimeoutMS: 30000, // 30 seconds to find a server
-                socketTimeoutMS: 60000,          // 60 seconds for socket operations
-                maxPoolSize: 10,
-                minPoolSize: 1,
-                maxIdleTimeMS: 60000,
-                connectTimeoutMS: 30000,         // 30 seconds to establish connection
-                heartbeatFrequencyMS: 10000,     // Check server health every 10s
-                retryWrites: true,
-                retryReads: true,
-            });
+    console.log('Creating new MongoDB connection...');
 
-            console.log('MongoDB connected successfully, state:', mongoose.connection.readyState);
-        } catch (err) {
+    const opts = {
+        bufferCommands: false,           // Disable buffering
+        serverSelectionTimeoutMS: 10000, // 10s to find a server (fail fast)
+        socketTimeoutMS: 45000,          // 45s for socket operations
+        maxPoolSize: 10,
+        minPoolSize: 0,                  // Allow pool to shrink to 0 in serverless
+        maxIdleTimeMS: 10000,            // Close idle connections after 10s
+        connectTimeoutMS: 10000,         // 10s to establish connection
+        retryWrites: true,
+        retryReads: true,
+    };
+
+    cached.promise = mongoose.connect(MONGODB_URI, opts)
+        .then((mongoose) => {
+            console.log('MongoDB connected successfully');
+            return mongoose;
+        })
+        .catch((err) => {
             console.error('MongoDB connection error:', err.message);
-            connectionPromise = null; // Reset so we can retry
+            cached.promise = null; // Reset promise so we can retry
             throw err;
-        }
-    })();
+        });
 
-    return connectionPromise;
+    cached.conn = await cached.promise;
+    return cached.conn;
 };
 
-// Connect to MongoDB on startup (don't await - let it run in background)
-connectDB().catch(err => {
-    console.error('Initial MongoDB connection failed:', err.message);
+// Handle connection errors
+mongoose.connection.on('error', (err) => {
+    console.error('MongoDB connection error:', err);
+    cached.conn = null;
+    cached.promise = null;
+});
+
+mongoose.connection.on('disconnected', () => {
+    console.log('MongoDB disconnected');
+    cached.conn = null;
+    cached.promise = null;
+});
+
+// Export connectDB for use in routes/middleware
+module.exports.connectDB = connectDB;
+
+// Middleware to ensure DB connection before processing requests
+const ensureDbConnected = async (req, res, next) => {
+    try {
+        await connectDB();
+        next();
+    } catch (err) {
+        console.error('Database connection failed in middleware:', err.message);
+        res.status(503).json({
+            error: 'Database temporarily unavailable',
+            message: 'Please try again in a moment'
+        });
+    }
+};
+
+// Apply DB middleware to all /api routes (except health check)
+app.use('/api', (req, res, next) => {
+    // Skip DB check for simple health endpoint
+    if (req.path === '/health') {
+        return next();
+    }
+    ensureDbConnected(req, res, next);
 });
 
 // Root endpoint
@@ -102,7 +151,7 @@ app.get('/', (req, res) => {
 // Must be defined BEFORE apiRoutes
 // ============================================
 
-// Health check endpoint
+// Health check endpoint (no DB required)
 app.get('/api/health', async (req, res) => {
     try {
         const dbState = mongoose.connection.readyState;
@@ -127,7 +176,7 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
-// Diagnostic endpoint for debugging
+// Diagnostic endpoint for debugging (actively tests connection)
 app.get('/api/debug/status', async (req, res) => {
     const startTime = Date.now();
     const logs = [];
@@ -145,6 +194,7 @@ app.get('/api/debug/status', async (req, res) => {
         log('Checking environment variables...');
         const envCheck = {
             MONGODB_URI: !!process.env.MONGODB_URI,
+            MONGODB_URI_PREFIX: process.env.MONGODB_URI ? process.env.MONGODB_URI.substring(0, 20) + '...' : 'not set',
             GOOGLE_CLIENT_ID: !!process.env.GOOGLE_CLIENT_ID,
             GOOGLE_CLIENT_SECRET: !!process.env.GOOGLE_CLIENT_SECRET,
             JWT_SECRET: !!process.env.JWT_SECRET,
@@ -159,20 +209,21 @@ app.get('/api/debug/status', async (req, res) => {
         const states = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
         log(`MongoDB state: ${states[dbState]} (${dbState})`);
 
-        // Try to connect if not connected
-        if (dbState !== 1) {
-            log('Attempting to connect to MongoDB...');
-            await connectDB();
-            log(`Connection attempt complete, new state: ${mongoose.connection.readyState}`);
-        }
+        // Check cached connection
+        const hasCachedConn = !!(global.mongoose && global.mongoose.conn);
+        const hasCachedPromise = !!(global.mongoose && global.mongoose.promise);
+        log(`Cached connection: ${hasCachedConn}, Cached promise: ${hasCachedPromise}`);
 
-        // Try a simple query if connected
-        if (mongoose.connection.readyState === 1) {
-            log('Testing database query...');
-            const User = require('./models/User');
-            const userCount = await User.countDocuments();
-            log(`User count: ${userCount}`);
-        }
+        // Try to connect
+        log('Attempting to connect to MongoDB...');
+        await connectDB();
+        log(`Connection attempt complete, new state: ${mongoose.connection.readyState}`);
+
+        // Try a simple query
+        log('Testing database query...');
+        const User = require('./models/User');
+        const userCount = await User.countDocuments();
+        log(`User count: ${userCount}`);
 
         const totalTime = Date.now() - startTime;
         log(`Diagnostic complete in ${totalTime}ms`);
@@ -181,6 +232,7 @@ app.get('/api/debug/status', async (req, res) => {
             status: 'ok',
             totalTimeMs: totalTime,
             database: states[mongoose.connection.readyState],
+            userCount,
             environment: envCheck,
             logs: logs
         });
@@ -189,6 +241,7 @@ app.get('/api/debug/status', async (req, res) => {
         res.status(500).json({
             status: 'error',
             error: err.message,
+            stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined,
             logs: logs
         });
     }

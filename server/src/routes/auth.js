@@ -1,9 +1,42 @@
 const express = require('express');
 const passport = require('passport');
+const mongoose = require('mongoose');
 const router = express.Router();
 const { generateToken, isAuthenticated } = require('../middleware/auth');
 
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+
+// Helper to get DB connection (uses global cache)
+const getConnection = async () => {
+    const cached = global.mongoose;
+    if (cached && cached.conn) {
+        return cached.conn;
+    }
+
+    const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/shopping-list';
+    const opts = {
+        bufferCommands: false,
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+        maxPoolSize: 10,
+        minPoolSize: 0,
+        maxIdleTimeMS: 10000,
+        connectTimeoutMS: 10000,
+        retryWrites: true,
+        retryReads: true,
+    };
+
+    if (!global.mongoose) {
+        global.mongoose = { conn: null, promise: null };
+    }
+
+    if (!global.mongoose.promise) {
+        global.mongoose.promise = mongoose.connect(MONGODB_URI, opts);
+    }
+
+    global.mongoose.conn = await global.mongoose.promise;
+    return global.mongoose.conn;
+};
 
 // @route   GET /api/auth/google
 // @desc    Initiate Google OAuth
@@ -114,6 +147,10 @@ router.get('/status', async (req, res) => {
 
         const jwt = require('jsonwebtoken');
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'shopping-list-secret-key');
+
+        // Ensure DB connection before querying
+        await getConnection();
+
         const User = require('../models/User');
         const user = await User.findById(decoded.userId);
 
@@ -131,7 +168,8 @@ router.get('/status', async (req, res) => {
             }
         });
     } catch (err) {
-        console.error('Auth status error:', err);
+        console.error('Auth status error:', err.message);
+        // Return unauthenticated on error instead of 500
         res.json({ authenticated: false });
     }
 });
@@ -153,7 +191,6 @@ router.get('/debug', (req, res) => {
 // @route   GET /api/auth/diagnostic
 // @desc    Full diagnostic endpoint with timing info
 router.get('/diagnostic', async (req, res) => {
-    const mongoose = require('mongoose');
     const startTime = Date.now();
     const logs = [];
 
@@ -169,17 +206,18 @@ router.get('/diagnostic', async (req, res) => {
         // Check MongoDB connection state
         const dbState = mongoose.connection.readyState;
         const states = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
-        log(`MongoDB state: ${states[dbState]} (${dbState})`);
+        log(`MongoDB initial state: ${states[dbState]} (${dbState})`);
 
-        // If connected, try a query
-        if (dbState === 1) {
-            log('Testing database query...');
-            const User = require('../models/User');
-            const userCount = await User.countDocuments();
-            log(`User count: ${userCount}`);
-        } else {
-            log('Database not connected, skipping query test');
-        }
+        // Try to establish connection
+        log('Attempting to connect...');
+        await getConnection();
+        log(`Connection established, state: ${mongoose.connection.readyState}`);
+
+        // Test database query
+        log('Testing database query...');
+        const User = require('../models/User');
+        const userCount = await User.countDocuments();
+        log(`User count: ${userCount}`);
 
         const totalTime = Date.now() - startTime;
         log(`Diagnostic complete in ${totalTime}ms`);
@@ -187,8 +225,9 @@ router.get('/diagnostic', async (req, res) => {
         res.json({
             status: 'ok',
             totalTimeMs: totalTime,
-            database: states[dbState],
-            dbState: dbState,
+            database: states[mongoose.connection.readyState],
+            dbState: mongoose.connection.readyState,
+            userCount,
             logs: logs
         });
     } catch (err) {

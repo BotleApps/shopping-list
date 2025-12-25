@@ -3,50 +3,40 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const mongoose = require('mongoose');
 const User = require('../models/User');
 
-// Helper to ensure DB is connected (waits up to 60 seconds for cold starts)
-const ensureConnected = async (maxWaitMs = 60000) => {
-    const startTime = Date.now();
+// Get the cached connection from index.js
+const getConnection = async () => {
+    // Access the global cached connection
+    const cached = global.mongoose;
 
-    // If already connected, return immediately
-    if (mongoose.connection.readyState === 1) {
-        return true;
+    if (cached && cached.conn) {
+        return cached.conn;
     }
 
-    console.log('Waiting for MongoDB connection... Current state:', mongoose.connection.readyState);
+    // If no cached connection, create one
+    const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/shopping-list';
 
-    // Wait for connection
-    while (mongoose.connection.readyState !== 1) {
-        if (Date.now() - startTime > maxWaitMs) {
-            console.error('MongoDB connection timeout after', maxWaitMs, 'ms');
-            throw new Error(`Database connection timeout after ${maxWaitMs}ms`);
-        }
+    const opts = {
+        bufferCommands: false,
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+        maxPoolSize: 10,
+        minPoolSize: 0,
+        maxIdleTimeMS: 10000,
+        connectTimeoutMS: 10000,
+        retryWrites: true,
+        retryReads: true,
+    };
 
-        // If disconnected, try to trigger connection
-        if (mongoose.connection.readyState === 0) {
-            console.log('MongoDB disconnected, attempting to reconnect...');
-            try {
-                await mongoose.connect(process.env.MONGODB_URI, {
-                    serverSelectionTimeoutMS: 30000,
-                    socketTimeoutMS: 60000,
-                    connectTimeoutMS: 30000,
-                });
-                console.log('Reconnection successful');
-            } catch (err) {
-                console.error('Reconnection attempt failed:', err.message);
-            }
-        }
-
-        // Wait 500ms before checking again
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        const elapsed = Math.round((Date.now() - startTime) / 1000);
-        if (elapsed % 5 === 0 && elapsed > 0) {
-            console.log(`Still waiting for MongoDB... ${elapsed}s elapsed, state:`, mongoose.connection.readyState);
-        }
+    if (!cached) {
+        global.mongoose = { conn: null, promise: null };
     }
 
-    console.log('MongoDB connected! Ready for queries.');
-    return true;
+    if (!global.mongoose.promise) {
+        global.mongoose.promise = mongoose.connect(MONGODB_URI, opts);
+    }
+
+    global.mongoose.conn = await global.mongoose.promise;
+    return global.mongoose.conn;
 };
 
 const setupPassport = () => {
@@ -58,11 +48,11 @@ const setupPassport = () => {
     // Deserialize user from session
     passport.deserializeUser(async (id, done) => {
         try {
-            await ensureConnected();
+            await getConnection();
             const user = await User.findById(id);
             done(null, user);
         } catch (err) {
-            console.error('Deserialize error:', err);
+            console.error('Deserialize error:', err.message);
             done(err, null);
         }
     });
@@ -81,16 +71,16 @@ const setupPassport = () => {
 
             // Ensure database is connected before proceeding
             console.log('Ensuring database connection...');
-            await ensureConnected();
-            console.log('Database connected, proceeding with user lookup');
+            await getConnection();
+            console.log('Database connected in', Date.now() - startTime, 'ms');
 
             // Check if user already exists
             let user = await User.findOne({ googleId: profile.id });
 
             if (user) {
                 console.log('Existing user found:', user.email, 'in', Date.now() - startTime, 'ms');
-                // Update last login
-                await user.updateLastLogin();
+                // Update last login (don't await to speed up response)
+                user.updateLastLogin().catch(err => console.error('Failed to update last login:', err.message));
                 return done(null, user);
             }
 
@@ -107,7 +97,7 @@ const setupPassport = () => {
             console.log('New user created:', user.email, 'in', Date.now() - startTime, 'ms');
             done(null, user);
         } catch (err) {
-            console.error('Google OAuth error:', err);
+            console.error('Google OAuth error:', err.message);
             console.error('Time elapsed:', Date.now() - startTime, 'ms');
             done(err, null);
         }
