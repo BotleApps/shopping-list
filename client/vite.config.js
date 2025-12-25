@@ -46,9 +46,25 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Don't precache index.html - let it be fetched fresh for auth redirects
+        globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
+        
+        // CRITICAL: Disable navigateFallback entirely
+        // This prevents the SW from intercepting navigation requests
+        // and serving a cached response that strips query parameters
+        navigateFallback: null,
+        
+        // Skip waiting ensures new SW activates immediately
+        skipWaiting: true,
+        clientsClaim: true,
+        
+        // Clean up old caches on update
+        cleanupOutdatedCaches: true,
+        
+        // Runtime caching for API calls only
         runtimeCaching: [
           {
+            // Cache API responses with NetworkFirst strategy
             urlPattern: /\/api\/.*/i,
             handler: 'NetworkFirst',
             options: {
@@ -59,6 +75,18 @@ export default defineConfig({
               },
               cacheableResponse: {
                 statuses: [0, 200]
+              }
+            }
+          },
+          {
+            // Cache static assets from CDNs
+            urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts',
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
               }
             }
           }

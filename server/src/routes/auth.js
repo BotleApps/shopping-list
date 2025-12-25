@@ -32,42 +32,24 @@ router.get('/google/callback', (req, res, next) => {
             // Generate JWT token
             const token = generateToken(user);
 
-            // Log callback headers and the user being signed in (avoid logging token)
-            try {
-                console.log('OAuth callback headers:', {
-                    origin: req.headers.origin,
-                    referer: req.headers.referer,
-                    host: req.headers.host,
-                    userAgent: req.headers['user-agent']
-                });
-            } catch (e) {
-                console.log('Failed to log callback headers:', e && e.message ? e.message : e);
-            }
-
-            console.log('Setting auth cookie for user:', user.email, 'uid:', user._id.toString());
+            console.log('OAuth callback for user:', user.email);
 
             // Cookie options for cross-origin authentication
-            // SameSite=None + Secure is required for cross-origin cookies
-            // Partitioned helps with modern browser cookie restrictions (CHIPS)
             const cookieOptions = {
                 httpOnly: true,
-                secure: true, // Always true for SameSite=None
+                secure: true,
                 sameSite: 'none',
-                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+                maxAge: 7 * 24 * 60 * 60 * 1000,
                 path: '/',
             };
 
-            // Add partitioned attribute for CHIPS support (Chrome 114+)
-            // This helps with third-party cookie restrictions
             if (process.env.NODE_ENV === 'production') {
                 cookieOptions.partitioned = true;
             }
 
             res.cookie('token', token, cookieOptions);
 
-            // Redirect to frontend with success and token in URL as fallback
-            // Mobile browsers may block cross-site cookies, so we include token in URL
-            console.log('Redirecting to client after auth success:', `${CLIENT_URL}?auth=success`);
+            // Redirect with token in URL (mobile browsers may block cookies)
             res.redirect(`${CLIENT_URL}?auth=success&token=${encodeURIComponent(token)}`);
         } catch (tokenError) {
             console.error('Token generation error:', tokenError);

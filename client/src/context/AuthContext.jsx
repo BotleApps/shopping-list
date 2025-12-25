@@ -21,6 +21,7 @@ export const AuthProvider = ({ children }) => {
     const processedUrlRef = React.useRef(false);
     if (!processedUrlRef.current && typeof window !== 'undefined') {
         processedUrlRef.current = true;
+        
         const params = new URLSearchParams(window.location.search);
         const tokenFromUrl = params.get('token');
         const authSuccess = params.get('auth') === 'success';
@@ -30,7 +31,7 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem('auth_token', tokenFromUrl);
         }
         
-        if (authSuccess) {
+        if (authSuccess || tokenFromUrl) {
             // Clean URL immediately
             window.history.replaceState({}, '', window.location.pathname);
         }

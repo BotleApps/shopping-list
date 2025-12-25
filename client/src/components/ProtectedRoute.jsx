@@ -12,7 +12,7 @@ const ProtectedRoute = ({ children }) => {
     // Check if we have a stored token (mobile browser fallback)
     const hasStoredToken = typeof window !== 'undefined' && localStorage.getItem('auth_token');
 
-    // If we have a token but auth failed, retry once (handles race conditions)
+    // If we have a token but auth failed, retry (handles race conditions)
     useEffect(() => {
         if (!loading && hasStoredToken && !isAuthenticated && retryCount < maxRetries) {
             console.log(`[ProtectedRoute] Token exists but not authenticated, retry ${retryCount + 1}/${maxRetries}`);
